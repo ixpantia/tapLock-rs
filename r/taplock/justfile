@@ -1,0 +1,10 @@
+
+install:
+    Rscript -e "devtools::install()"
+    Rscript cleanup.R
+
+test:
+    Rscript -e "devtools::test()"
+
+document:
+    Rscript -e "rextendr::document()"
