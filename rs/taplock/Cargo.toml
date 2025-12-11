@@ -1,0 +1,26 @@
+[package]
+name = "taplock-rs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+async-trait = { workspace = true }
+axum = { version = "0.8.7", optional = true }
+axum-extra = { version = "0.12.2", features = ["cookie"], optional = true }
+bytes = "1.11.0"
+cookie = { workspace = true }
+jsonwebtoken = { workspace = true }
+oauth2 = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+url = { workspace = true }
+extendr-api = { workspace = true, optional = true }
+
+[features]
+extendr-api = ["dep:extendr-api"]
+axum-extra = ["dep:axum-extra"]
+axum = ["dep:axum", "axum-extra"]

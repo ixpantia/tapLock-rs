@@ -1,0 +1,18 @@
+[package]
+name = 'taplock-r'
+publish = false
+version = '0.1.0'
+edition = '2021'
+rust-version = '1.65'
+
+[lib]
+crate-type = [ 'staticlib' ]
+name = 'taplock'
+
+[dependencies]
+taplock-rs = { path = "../../../../rs/taplock", features = ["extendr-api"] }
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+extendr-api = { workspace = true }
+serde_json = { workspace = true }
+async-trait = { workspace = true }
+cookie = { workspace = true }
