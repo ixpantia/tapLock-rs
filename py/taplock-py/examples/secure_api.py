@@ -29,12 +29,12 @@ app.include_router(auth.router, tags=["Auth"])
 
 # 4. Protect Endpoints
 @app.get("/dashboard-json-error")
-async def dashboard_json_error(user: dict = Depends(auth)):
+async def dashboard_json_error(token: dict = Depends(auth)):
     """This endpoint will return a 401 JSON error if not authenticated."""
-    return {"message": f"Welcome back!", "user": user}
+    return {"message": f"Welcome back!", "user": token.get("preferred_username")}
 
 
 @app.get("/dashboard-redirect")
-async def dashboard_redirect(user: dict = Depends(auth.secure(redirect_on_fail=True))):
+async def dashboard_redirect(token: dict = Depends(auth.secure(redirect_on_fail=True))):
     """This endpoint will redirect to the login page if not authenticated."""
-    return {"message": f"Welcome back!", "user": user}
+    return {"message": f"Welcome back!", "user": token.get("preferred_username")}
