@@ -1,4 +1,4 @@
-use super::{ACCESS_TOKEN_COOKIE_NAME, REFRESH_TOKEN_COOKIE_NAME, TAPLOCK_LOGIN_ENDPOINT};
+use super::{ACCESS_TOKEN_COOKIE_NAME, REFRESH_TOKEN_COOKIE_NAME, TAPLOCK_CALLBACK_ENDPOINT};
 
 use axum::{extract::Request, middleware::Next, response::Response};
 
@@ -117,7 +117,7 @@ where
             Err(e) => {
                 tracing::warn!("Failed to refresh tokens: {:?}. Redirecting to login.", e);
                 // Refresh failed, clear all auth cookies and redirect to login
-                response = Redirect::to(TAPLOCK_LOGIN_ENDPOINT).into_response();
+                response = Redirect::to(TAPLOCK_CALLBACK_ENDPOINT).into_response();
 
                 let remove_access_cookie = remove_auth_cookie(ACCESS_TOKEN_COOKIE_NAME);
                 response.headers_mut().append(
@@ -135,7 +135,7 @@ where
     } else {
         // No refresh token available, or access token was invalid and no refresh token
         tracing::debug!("No valid access token and no refresh token. Redirecting to login.");
-        response = Redirect::to(TAPLOCK_LOGIN_ENDPOINT).into_response();
+        response = Redirect::to(TAPLOCK_CALLBACK_ENDPOINT).into_response();
 
         // Ensure invalid access token is removed if it existed
         let remove_access_cookie = remove_auth_cookie(ACCESS_TOKEN_COOKIE_NAME);

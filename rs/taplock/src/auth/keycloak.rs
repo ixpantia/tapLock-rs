@@ -11,7 +11,7 @@ use oauth2::{
 use serde::{Deserialize, Serialize};
 
 use super::jwks::JwksClient;
-use super::{OAuth2Client, OAuth2Response, TAPLOCK_LOGIN_ENDPOINT};
+use super::{OAuth2Client, OAuth2Response, TAPLOCK_CALLBACK_ENDPOINT};
 use crate::error::TapLockError;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -111,7 +111,7 @@ pub async fn build_oauth2_state_keycloak(
     let token_url = format!("{base_url}/realms/{realm}/protocol/openid-connect/token");
     let jwks_url = format!("{base_url}/realms/{realm}/protocol/openid-connect/certs");
     let app_url = app_url.trim_end_matches('/');
-    let redirect_url = format!("{app_url}{TAPLOCK_LOGIN_ENDPOINT}");
+    let redirect_url = format!("{app_url}{TAPLOCK_CALLBACK_ENDPOINT}");
 
     let client = Client::new(ClientId::new(client_id.to_string()))
         .set_client_secret(ClientSecret::new(client_secret.to_string()))

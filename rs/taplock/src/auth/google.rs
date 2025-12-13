@@ -11,7 +11,7 @@ use oauth2::{
 use serde::{Deserialize, Serialize};
 
 use super::jwks::JwksClient;
-use super::{OAuth2Client, OAuth2Response, TAPLOCK_LOGIN_ENDPOINT};
+use super::{OAuth2Client, OAuth2Response, TAPLOCK_CALLBACK_ENDPOINT};
 use crate::error::TapLockError;
 
 const AUTH_BASE_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -109,7 +109,7 @@ pub async fn build_oauth2_state_google(
     use_refresh_token: bool,
 ) -> std::result::Result<GoogleOAuth2Client, TapLockError> {
     let app_url = app_url.trim_end_matches('/');
-    let redirect_url = format!("{app_url}{TAPLOCK_LOGIN_ENDPOINT}");
+    let redirect_url = format!("{app_url}{TAPLOCK_CALLBACK_ENDPOINT}");
 
     let client = Client::new(ClientId::new(client_id.to_string()))
         .set_client_secret(ClientSecret::new(client_secret.to_string()))

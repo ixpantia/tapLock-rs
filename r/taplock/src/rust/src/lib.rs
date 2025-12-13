@@ -5,7 +5,7 @@ use tokio::sync::oneshot::{self, error::TryRecvError};
 use taplock_rs::{
     auth::{entra_id, google},
     keycloak, OAuth2Client, OAuth2Response, TapLockError, ACCESS_TOKEN_COOKIE_NAME,
-    REFRESH_TOKEN_COOKIE_NAME, TAPLOCK_LOGIN_ENDPOINT,
+    REFRESH_TOKEN_COOKIE_NAME, TAPLOCK_CALLBACK_ENDPOINT,
 };
 
 #[extendr]
@@ -19,8 +19,8 @@ fn get_refresh_token_cookie_name() -> &'static str {
 }
 
 #[extendr]
-fn get_taplock_login_endpoint() -> &'static str {
-    TAPLOCK_LOGIN_ENDPOINT
+fn get_taplock_callback_endpoint() -> &'static str {
+    TAPLOCK_CALLBACK_ENDPOINT
 }
 
 #[extendr]
@@ -250,7 +250,7 @@ extendr_module! {
     mod tapLock;
     fn get_access_token_cookie_name;
     fn get_refresh_token_cookie_name;
-    fn get_taplock_login_endpoint;
+    fn get_taplock_callback_endpoint;
     fn parse_cookies;
     fn initialize_google_runtime;
     fn initialize_entra_id_runtime;

@@ -14,7 +14,7 @@ get_access_token_cookie_name <- function() .Call(wrap__get_access_token_cookie_n
 
 get_refresh_token_cookie_name <- function() .Call(wrap__get_refresh_token_cookie_name)
 
-get_taplock_login_endpoint <- function() .Call(wrap__get_taplock_login_endpoint)
+get_taplock_callback_endpoint <- function() .Call(wrap__get_taplock_callback_endpoint)
 
 parse_cookies <- function(cookie_string) .Call(wrap__parse_cookies, cookie_string)
 

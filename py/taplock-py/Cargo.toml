@@ -1,0 +1,17 @@
+[package]
+name = "taplock-py"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "taplock_py"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.27.0", features = ["extension-module"] }
+pyo3-async-runtimes = { version = "0.27", features = ["attributes", "tokio-runtime"] }
+pythonize = "0.27.0"
+serde = { workspace = true }
+serde_json = { workspace = true }
+taplock-rs = { path = "../../rs/taplock" }
+tokio = { workspace = true }

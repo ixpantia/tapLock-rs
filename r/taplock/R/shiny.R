@@ -1,6 +1,6 @@
 internal_add_auth_layers <- function(config, tower) {
   # Run functions to get endpoint and cookie names at the start
-  login_endpoint <- get_taplock_login_endpoint()
+  login_endpoint <- get_taplock_callback_endpoint()
   access_cookie_name <- get_access_token_cookie_name()
   refresh_cookie_name <- get_refresh_token_cookie_name()
 

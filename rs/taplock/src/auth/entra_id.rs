@@ -11,7 +11,7 @@ use oauth2::{
 use serde::{Deserialize, Serialize};
 
 use super::jwks::JwksClient;
-use super::{OAuth2Client, OAuth2Response, TAPLOCK_LOGIN_ENDPOINT};
+use super::{OAuth2Client, OAuth2Response, TAPLOCK_CALLBACK_ENDPOINT};
 use crate::error::TapLockError;
 
 const JWKS_URL: &str = "https://login.microsoftonline.com/common/discovery/keys";
@@ -115,7 +115,7 @@ pub async fn build_oauth2_state_azure_ad(
     let auth_url = format!("https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/authorize");
     let token_url = format!("https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token");
     let app_url = app_url.trim_end_matches('/');
-    let redirect_url = format!("{app_url}{TAPLOCK_LOGIN_ENDPOINT}");
+    let redirect_url = format!("{app_url}{TAPLOCK_CALLBACK_ENDPOINT}");
 
     let client = Client::new(ClientId::new(client_id.to_string()))
         .set_client_secret(ClientSecret::new(client_secret.to_string()))

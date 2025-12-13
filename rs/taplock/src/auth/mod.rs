@@ -8,7 +8,7 @@ pub mod keycloak;
 
 pub const ACCESS_TOKEN_COOKIE_NAME: &str = "taplock_access_token";
 pub const REFRESH_TOKEN_COOKIE_NAME: &str = "taplock_refresh_token";
-pub const TAPLOCK_LOGIN_ENDPOINT: &str = "/.taplock/login";
+pub const TAPLOCK_CALLBACK_ENDPOINT: &str = "/.taplock/callback";
 
 // TODO: Pasar todo esto a tapLock-rs distribuible
 
