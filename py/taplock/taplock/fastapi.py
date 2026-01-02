@@ -1,17 +1,25 @@
 
 from typing import Any, Dict, Optional
 
-import taplock_py
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
+
+from .taplock import (
+    get_access_token_cookie_name,
+    get_refresh_token_cookie_name,
+    get_taplock_callback_endpoint,
+    initialize_entra_id,
+    initialize_google,
+    initialize_keycloak,
+)
 
 
 class TapLock:
     def __init__(self):
         self.client = None
-        self.access_token_cookie = taplock_py.get_access_token_cookie_name()
-        self.refresh_token_cookie = taplock_py.get_refresh_token_cookie_name()
-        self.callback_endpoint = taplock_py.get_taplock_callback_endpoint()
+        self.access_token_cookie = get_access_token_cookie_name()
+        self.refresh_token_cookie = get_refresh_token_cookie_name()
+        self.callback_endpoint = get_taplock_callback_endpoint()
 
         # Create a router that pre-wires the auth endpoints
         self.router = APIRouter()
@@ -30,13 +38,13 @@ class TapLock:
     # --- Initialization Methods (Call these in Lifespan) ---
 
     async def init_google(self, client_id: str, client_secret: str, app_url: str, use_refresh_token: bool = True):
-        self.client = await taplock_py.initialize_google(client_id, client_secret, app_url, use_refresh_token)
+        self.client = await initialize_google(client_id, client_secret, app_url, use_refresh_token)
 
     async def init_entra_id(self, client_id: str, client_secret: str, app_url: str, tenant_id: str, use_refresh_token: bool = True):
-        self.client = await taplock_py.initialize_entra_id(client_id, client_secret, app_url, tenant_id, use_refresh_token)
+        self.client = await initialize_entra_id(client_id, client_secret, app_url, tenant_id, use_refresh_token)
 
     async def init_keycloak(self, client_id: str, client_secret: str, app_url: str, base_url: str, realm: str, use_refresh_token: bool = True):
-        self.client = await taplock_py.initialize_keycloak(client_id, client_secret, app_url, base_url, realm, use_refresh_token)
+        self.client = await initialize_keycloak(client_id, client_secret, app_url, base_url, realm, use_refresh_token)
 
     # --- Route Handlers ---
 

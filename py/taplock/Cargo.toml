@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "taplock_py"
+name = "taplock"
 crate-type = ["cdylib"]
 
 [dependencies]

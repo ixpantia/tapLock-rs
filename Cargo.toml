@@ -3,7 +3,7 @@ resolver = "2"
 members = [
     "rs/taplock",
     "r/taplock/src/rust",
-    "py/taplock-py",
+    "py/taplock",
 ]
 
 
