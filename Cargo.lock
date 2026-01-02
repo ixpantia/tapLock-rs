@@ -2031,7 +2031,7 @@ dependencies = [
 
 [[package]]
 name = "taplock-py"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "pyo3",
  "pyo3-async-runtimes",
@@ -2044,7 +2044,7 @@ dependencies = [
 
 [[package]]
 name = "taplock-r"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "cookie",
@@ -2056,7 +2056,7 @@ dependencies = [
 
 [[package]]
 name = "taplock-rs"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "axum",

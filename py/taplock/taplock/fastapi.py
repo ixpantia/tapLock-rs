@@ -48,11 +48,22 @@ class TapLock:
 
     # --- Route Handlers ---
 
-    async def login(self) -> RedirectResponse:
+    async def login(self, return_to: str = "/") -> RedirectResponse:
         self._check_init()
-        return RedirectResponse(self.client.get_authorization_url())
+        auth_url = self.client.get_authorization_url()
+        response = RedirectResponse(auth_url)
+        # Store the destination URL in a temporary cookie
+        response.set_cookie(
+            key="taplock_return_to",
+            value=return_to,
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            max_age=300 # 5 minutes is plenty for a login flow
+        )
+        return response
 
-    async def callback(self, request: Request, response: Response) -> Dict[str, Any]:
+    async def callback(self, request: Request) -> RedirectResponse:
         self._check_init()
         code = request.query_params.get("code")
         if not code:
@@ -63,8 +74,19 @@ class TapLock:
         except Exception as e:
              raise HTTPException(status_code=400, detail=f"Failed to exchange code: {str(e)}")
 
-        self._set_cookies(response, token_data)
-        return token_data
+        # Retrieve the return URL from the cookie, default to "/"
+        return_to = request.cookies.get("taplock_return_to", "/")
+
+        # Create the redirect response
+        redirect_response = RedirectResponse(url=return_to)
+
+        # Set the authentication cookies on the new response
+        self._set_cookies(redirect_response, token_data)
+
+        # Clear the temporary return_to cookie
+        redirect_response.delete_cookie("taplock_return_to")
+
+        return redirect_response
 
     async def logout(self, response: Response):
         """Clears the authentication cookies."""
@@ -74,7 +96,13 @@ class TapLock:
 
     # --- Dependency ---
 
-    async def _secure_impl(self, request: Request, response: Response, redirect_on_fail: bool):
+    async def _secure_impl(
+        self,
+        request: Request,
+        response: Response,
+        redirect_on_fail: bool,
+        return_to: Optional[str] = None
+    ):
         self._check_init()
         access_token = request.cookies.get(self.access_token_cookie)
 
@@ -88,8 +116,10 @@ class TapLock:
         refresh_token = request.cookies.get(self.refresh_token_cookie)
         if not refresh_token:
             if redirect_on_fail:
-                login_response = await self.login()
-                raise HTTPException(status_code=307, headers={"Location": login_response.headers["location"]})
+                # Capture current URL if no specific return_to is provided
+                target = return_to or str(request.url)
+                login_response = await self.login(return_to=target)
+                raise HTTPException(status_code=307, headers=dict(login_response.headers))
             raise HTTPException(status_code=401, detail="Not authenticated")
 
         try:
@@ -98,19 +128,22 @@ class TapLock:
             return token_data.get("fields", token_data)
         except Exception:
             if redirect_on_fail:
-                login_response = await self.login()
-                raise HTTPException(status_code=307, headers={"Location": login_response.headers["location"]})
+                target = return_to or str(request.url)
+                login_response = await self.login(return_to=target)
+                raise HTTPException(status_code=307, headers=dict(login_response.headers))
             raise HTTPException(status_code=401, detail="Session expired")
 
-    def secure(self, redirect_on_fail: bool = False):
+    def secure(self, redirect_on_fail: bool = False, return_to: Optional[str] = None):
         """
         Returns a dependency that enforces authentication.
 
         :param redirect_on_fail: If True, redirect to login on failure.
                                  If False, raise 401 HTTPException.
+        :param return_to: The URL to redirect to after successful login.
+                          If None, it will redirect back to the current request URL.
         """
         async def dependency(request: Request, response: Response) -> Dict[str, Any]:
-            return await self._secure_impl(request, response, redirect_on_fail)
+            return await self._secure_impl(request, response, redirect_on_fail, return_to)
         return dependency
 
     # Allows using `Depends(auth)` directly for default behavior (no redirect).
