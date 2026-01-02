@@ -36,5 +36,19 @@ async def dashboard_json_error(token: dict = Depends(auth)):
 
 @app.get("/dashboard-redirect")
 async def dashboard_redirect(token: dict = Depends(auth.secure(redirect_on_fail=True))):
-    """This endpoint will redirect to the login page if not authenticated."""
+    """
+    This endpoint will redirect to the login page if not authenticated.
+    By default, it will return the user to THIS page after successful login.
+    """
     return {"message": f"Welcome back!", "user": token.get("preferred_username")}
+
+
+@app.get("/dashboard-custom-redirect")
+async def dashboard_custom_redirect(
+    token: dict = Depends(auth.secure(redirect_on_fail=True, return_to="/dashboard-json-error"))
+):
+    """
+    This endpoint will redirect to the login page if not authenticated.
+    After login, it will redirect the user to '/dashboard-json-error' instead of here.
+    """
+    return {"message": "You should not see this if not logged in", "user": token.get("preferred_username")}

@@ -178,7 +178,7 @@ fn get_taplock_callback_endpoint() -> &'static str {
 }
 
 #[pymodule]
-mod taplock_py {
+mod taplock {
 
     #[pymodule_export]
     use super::get_access_token_cookie_name;
