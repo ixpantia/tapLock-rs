@@ -11,7 +11,7 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
-    "fastapi",
+    "fastapi"
 ]
 dynamic = ["version"]
 

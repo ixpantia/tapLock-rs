@@ -1,0 +1,14 @@
+[project]
+name = "py-examples"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "dotenv>=0.9.9",
+    "fastapi[standard]>=0.128.0",
+    "taplock",
+]
+
+[tool.uv.sources]
+taplock = { path = "../../py/taplock", editable = true  }
