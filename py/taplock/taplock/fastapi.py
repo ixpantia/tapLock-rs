@@ -15,8 +15,11 @@ from .taplock import (
     get_refresh_token_cookie_name,
     get_taplock_callback_endpoint,
     initialize_entra_id,
+    initialize_entra_id_from_env,
     initialize_google,
+    initialize_google_from_env,
     initialize_keycloak,
+    initialize_keycloak_from_env,
 )
 
 
@@ -51,6 +54,15 @@ class TapLock:
 
     async def init_keycloak(self, client_id: str, client_secret: str, app_url: str, base_url: str, realm: str, use_refresh_token: bool = True):
         self.client = await initialize_keycloak(client_id, client_secret, app_url, base_url, realm, use_refresh_token)
+
+    async def init_google_from_env(self):
+        self.client = await initialize_google_from_env()
+
+    async def init_entra_id_from_env(self):
+        self.client = await initialize_entra_id_from_env()
+
+    async def init_keycloak_from_env(self):
+        self.client = await initialize_keycloak_from_env()
 
     # --- Route Handlers ---
     async def login(self, return_to: str = "/") -> Response:

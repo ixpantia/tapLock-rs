@@ -1,13 +1,13 @@
 
 build-r-wrappers:
-    cd r/rdaccess/src/rust && cargo build --release
-    cd r/rdaccess && Rscript -e "rextendr::document()"
+    cd r/taplock/src/rust && cargo build --release
+    cd r/taplock && Rscript -e "rextendr::document()"
 
 test-r-wrappers:
-    just r/rdaccess/test
+    just r/taplock/test
 
 install-r-wrappers:
-    just r/rdaccess/install
+    just r/taplock/install
 
 document-r-wrappers:
-    just r/rdaccess/document
+    just r/taplock/document

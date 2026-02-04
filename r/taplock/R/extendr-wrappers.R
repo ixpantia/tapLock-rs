@@ -20,9 +20,15 @@ parse_cookies <- function(cookie_string) .Call(wrap__parse_cookies, cookie_strin
 
 initialize_google_runtime <- function(client_id, client_secret, app_url, use_refresh_token) .Call(wrap__initialize_google_runtime, client_id, client_secret, app_url, use_refresh_token)
 
+initialize_google_from_env_runtime <- function() .Call(wrap__initialize_google_from_env_runtime)
+
 initialize_entra_id_runtime <- function(client_id, client_secret, app_url, tenant_id, use_refresh_token) .Call(wrap__initialize_entra_id_runtime, client_id, client_secret, app_url, tenant_id, use_refresh_token)
 
+initialize_entra_id_from_env_runtime <- function() .Call(wrap__initialize_entra_id_from_env_runtime)
+
 initialize_keycloak_runtime <- function(client_id, client_secret, app_url, base_url, realm, use_refresh_token) .Call(wrap__initialize_keycloak_runtime, client_id, client_secret, app_url, base_url, realm, use_refresh_token)
+
+initialize_keycloak_from_env_runtime <- function() .Call(wrap__initialize_keycloak_from_env_runtime)
 
 AsyncFuture <- new.env(parent = emptyenv())
 

@@ -28,3 +28,21 @@ new_entra_id_config <- function(
   }
   return(runtime_result)
 }
+
+#' @title Create a new entra_id_config object from environment variables
+#' @description Creates a new entra_id_config object using environment variables:
+#' - TAPLOCK_ENTRA_ID_CLIENT_ID
+#' - TAPLOCK_ENTRA_ID_CLIENT_SECRET
+#' - TAPLOCK_ENTRA_ID_TENANT_ID
+#' - TAPLOCK_APP_URL
+#' - TAPLOCK_ENTRA_ID_USE_REFRESH_TOKEN (Optional)
+#'
+#' @return An entra_id_config object
+#' @export
+new_entra_id_config_from_env <- function() {
+  runtime_result <- initialize_entra_id_from_env_runtime()
+  if (is_error(runtime_result)) {
+    rlang::abort(runtime_result$value)
+  }
+  return(runtime_result)
+}

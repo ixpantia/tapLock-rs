@@ -35,11 +35,15 @@ auth = TapLock()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 2. Configure in Lifespan (Async)
-    await auth.init_google(
-        client_id=os.getenv("GOOGLE_CLIENT_ID"),
-        client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-        app_url="http://localhost:8000/" 
-    )
+    # You can initialize with explicit credentials:
+    # await auth.init_google(
+    #     client_id=os.getenv("GOOGLE_CLIENT_ID"),
+    #     client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+    #     app_url="http://localhost:8000/" 
+    # )
+    
+    # Or initialize directly from environment variables:
+    await auth.init_google_from_env()
     yield
 
 app = FastAPI(lifespan=lifespan)
@@ -80,7 +84,19 @@ app.add_middleware(TapLockMiddleware, auth=auth, redirect_on_fail=True)
 
 ## Configuration Methods
 
-`taplock` supports several providers out of the box:
+`taplock` supports several providers out of the box. You can initialize them manually or from environment variables.
+
+### Environment Variable Initialization
+
+For ease of use, you can call `init_*_from_env()` which will look for the following variables:
+
+| Provider | Method | Environment Variables |
+|----------|--------|-----------------------|
+| **Google** | `init_google_from_env()` | `TAPLOCK_GOOGLE_CLIENT_ID`, `TAPLOCK_GOOGLE_CLIENT_SECRET`, `TAPLOCK_APP_URL`, `TAPLOCK_GOOGLE_USE_REFRESH_TOKEN` (opt) |
+| **Entra ID** | `init_entra_id_from_env()` | `TAPLOCK_ENTRA_ID_CLIENT_ID`, `TAPLOCK_ENTRA_ID_CLIENT_SECRET`, `TAPLOCK_ENTRA_ID_TENANT_ID`, `TAPLOCK_APP_URL`, `TAPLOCK_ENTRA_ID_USE_REFRESH_TOKEN` (opt) |
+| **Keycloak** | `init_keycloak_from_env()` | `TAPLOCK_KEYCLOAK_URL`, `TAPLOCK_KEYCLOAK_REALM`, `TAPLOCK_KEYCLOAK_CLIENT_ID`, `TAPLOCK_KEYCLOAK_CLIENT_SECRET`, `TAPLOCK_APP_URL`, `TAPLOCK_KEYCLOAK_USE_REFRESH_TOKEN` (opt) |
+
+### Manual Initialization
 
 - **Google**: `await auth.init_google(client_id, client_secret, app_url)`
 - **Entra ID**: `await auth.init_entra_id(client_id, client_secret, app_url, tenant_id)`

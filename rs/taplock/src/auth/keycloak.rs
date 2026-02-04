@@ -77,7 +77,7 @@ impl KeycloakOAuth2Client {
         let use_refresh_token = match std::env::var("TAPLOCK_KEYCLOAK_USE_REFRESH_TOKEN") {
             Ok(s) => s.parse::<bool>().unwrap_or_else(|_| {
                 // Log a warning if parsing fails, but don't add to missing_env_vars as it was present.
-                eprintln!("Warning: TAPLOCK_KEYCLOAK_USE_REFRESH_TOKEN value '{}' is not a valid boolean. Defaulting to false.", s);
+                eprintln!("Warning: TAPLOCK_KEYCLOAK_USE_REFRESH_TOKEN value '{}' is not a valid boolean. Defaulting to true.", s);
                 true
             }),
             Err(_) => true, // Default to false if variable is not set

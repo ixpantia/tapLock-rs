@@ -51,6 +51,44 @@ impl GoogleOAuth2Client {
     fn get_jwk(&self, kid: &str) -> Option<jsonwebtoken::jwk::Jwk> {
         self.jwks_client.get_key(kid)
     }
+
+    /// Initializes a Google client from environment variables
+    ///
+    /// - TAPLOCK_GOOGLE_CLIENT_ID (OAuth2 client ID)
+    /// - TAPLOCK_GOOGLE_CLIENT_SECRET (OAuth2 client secret)
+    /// - TAPLOCK_APP_URL (Base URL of this application for redirects)
+    /// - TAPLOCK_GOOGLE_USE_REFRESH_TOKEN (Optional, "true" or "false", defaults to true)
+    ///
+    /// The error returns a vector of strings, either listing missing environment variables
+    /// or describing an error during client initialization.
+    pub async fn from_env() -> Result<Self, TapLockError> {
+        let mut missing_env_vars = Vec::new();
+
+        let get_env_var = |name: &str, missing: &mut Vec<String>| {
+            std::env::var(name).unwrap_or_else(|_| {
+                missing.push(name.to_string());
+                String::new() // Return an empty string as a placeholder if not found
+            })
+        };
+
+        let client_id = get_env_var("TAPLOCK_GOOGLE_CLIENT_ID", &mut missing_env_vars);
+        let client_secret = get_env_var("TAPLOCK_GOOGLE_CLIENT_SECRET", &mut missing_env_vars);
+        let app_url = get_env_var("TAPLOCK_APP_URL", &mut missing_env_vars);
+
+        let use_refresh_token = match std::env::var("TAPLOCK_GOOGLE_USE_REFRESH_TOKEN") {
+            Ok(s) => s.parse::<bool>().unwrap_or_else(|_| {
+                eprintln!("Warning: TAPLOCK_GOOGLE_USE_REFRESH_TOKEN value '{}' is not a valid boolean. Defaulting to true.", s);
+                true
+            }),
+            Err(_) => true,
+        };
+
+        if !missing_env_vars.is_empty() {
+            return Err(TapLockError::MissingEnv(missing_env_vars));
+        }
+
+        build_oauth2_state_google(&client_id, &client_secret, &app_url, use_refresh_token).await
+    }
 }
 
 fn decode_access_token(
