@@ -38,7 +38,7 @@ type GoogleClientFull = Client<
     oauth2::EndpointSet,
 >;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct GoogleOAuth2Client {
     reqwest_client: reqwest::Client,
     client: GoogleClientFull,

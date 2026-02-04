@@ -15,7 +15,7 @@ pub const TAPLOCK_CALLBACK_ENDPOINT: &str = "/.taplock/callback";
 use crate::error::TapLockError;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OAuth2Response {
     pub access_token: String,
     pub refresh_token: Option<String>,
@@ -23,7 +23,7 @@ pub struct OAuth2Response {
 }
 
 #[async_trait::async_trait]
-pub trait OAuth2Client: Send + Sync {
+pub trait OAuth2Client: Send + Sync + Clone + std::fmt::Debug {
     async fn exchange_refresh_token(
         &self,
         refresh_token: String,

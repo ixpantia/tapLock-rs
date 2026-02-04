@@ -19,6 +19,8 @@ pub enum TapLockError {
     JwtError(#[from] jsonwebtoken::errors::Error),
     #[error("KID not found in JWKs")]
     KidNotFound,
+    #[error("Missing Environment Variables: {0:?}")]
+    MissingEnv(Vec<String>),
 }
 
 impl TapLockError {

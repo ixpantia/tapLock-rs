@@ -36,7 +36,7 @@ type AzureADClientFull = Client<
     oauth2::EndpointSet,
 >;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AzureADOAuth2Client {
     reqwest_client: reqwest::Client,
     client: AzureADClientFull,
