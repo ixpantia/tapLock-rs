@@ -8,6 +8,54 @@ use taplock_rs::{
     REFRESH_TOKEN_COOKIE_NAME, TAPLOCK_CALLBACK_ENDPOINT,
 };
 
+#[derive(Clone, Debug)]
+enum ClientEnum {
+    Google(google::GoogleOAuth2Client),
+    EntraId(entra_id::AzureADOAuth2Client),
+    Keycloak(keycloak::KeycloakOAuth2Client),
+}
+
+#[async_trait::async_trait]
+impl OAuth2Client for ClientEnum {
+    async fn exchange_refresh_token(
+        &self,
+        refresh_token: String,
+    ) -> std::result::Result<OAuth2Response, TapLockError> {
+        match self {
+            ClientEnum::Google(c) => c.exchange_refresh_token(refresh_token).await,
+            ClientEnum::EntraId(c) => c.exchange_refresh_token(refresh_token).await,
+            ClientEnum::Keycloak(c) => c.exchange_refresh_token(refresh_token).await,
+        }
+    }
+    async fn exchange_code(
+        &self,
+        code: String,
+    ) -> std::result::Result<OAuth2Response, TapLockError> {
+        match self {
+            ClientEnum::Google(c) => c.exchange_code(code).await,
+            ClientEnum::EntraId(c) => c.exchange_code(code).await,
+            ClientEnum::Keycloak(c) => c.exchange_code(code).await,
+        }
+    }
+    fn decode_access_token(
+        &self,
+        access_token: String,
+    ) -> std::result::Result<OAuth2Response, TapLockError> {
+        match self {
+            ClientEnum::Google(c) => c.decode_access_token(access_token),
+            ClientEnum::EntraId(c) => c.decode_access_token(access_token),
+            ClientEnum::Keycloak(c) => c.decode_access_token(access_token),
+        }
+    }
+    fn get_authorization_url(&self) -> String {
+        match self {
+            ClientEnum::Google(c) => c.get_authorization_url(),
+            ClientEnum::EntraId(c) => c.get_authorization_url(),
+            ClientEnum::Keycloak(c) => c.get_authorization_url(),
+        }
+    }
+}
+
 #[extendr]
 fn get_access_token_cookie_name() -> &'static str {
     ACCESS_TOKEN_COOKIE_NAME
@@ -95,7 +143,7 @@ impl AsyncFuture {
 #[extendr]
 struct OAuth2Runtime {
     runtime: tokio::runtime::Runtime,
-    client: Arc<dyn OAuth2Client>,
+    client: Arc<ClientEnum>,
     app_url: Robj,
 }
 
@@ -145,6 +193,28 @@ impl OAuth2Runtime {
 }
 
 #[extendr]
+fn initialize_google_from_env_runtime() -> Result<OAuth2Runtime> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()
+        .map_err(TapLockError::Io)?;
+
+    let client = runtime.block_on(google::GoogleOAuth2Client::from_env())?;
+
+    let client = Arc::new(ClientEnum::Google(client));
+
+    let app_url_str = std::env::var("TAPLOCK_APP_URL").unwrap_or_default();
+    let app_url = Strings::from(app_url_str).into_robj();
+
+    Ok(OAuth2Runtime {
+        client,
+        runtime,
+        app_url,
+    })
+}
+
+#[extendr]
 fn initialize_google_runtime(
     client_id: &str,
     client_secret: &str,
@@ -164,9 +234,31 @@ fn initialize_google_runtime(
         use_refresh_token,
     ))?;
 
-    let client = Arc::from(client);
+    let client = Arc::new(ClientEnum::Google(client));
 
     let app_url = Strings::from(app_url).into_robj();
+
+    Ok(OAuth2Runtime {
+        client,
+        runtime,
+        app_url,
+    })
+}
+
+#[extendr]
+fn initialize_entra_id_from_env_runtime() -> Result<OAuth2Runtime> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()
+        .map_err(TapLockError::Io)?;
+
+    let client = runtime.block_on(entra_id::AzureADOAuth2Client::from_env())?;
+
+    let client = Arc::new(ClientEnum::EntraId(client));
+
+    let app_url_str = std::env::var("TAPLOCK_APP_URL").unwrap_or_default();
+    let app_url = Strings::from(app_url_str).into_robj();
 
     Ok(OAuth2Runtime {
         client,
@@ -197,9 +289,31 @@ fn initialize_entra_id_runtime(
         tenant_id,
     ))?;
 
-    let client = Arc::from(client);
+    let client = Arc::new(ClientEnum::EntraId(client));
 
     let app_url = Strings::from(app_url).into_robj();
+
+    Ok(OAuth2Runtime {
+        client,
+        runtime,
+        app_url,
+    })
+}
+
+#[extendr]
+fn initialize_keycloak_from_env_runtime() -> Result<OAuth2Runtime> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()
+        .map_err(TapLockError::Io)?;
+
+    let client = runtime.block_on(keycloak::KeycloakOAuth2Client::from_env())?;
+
+    let client = Arc::new(ClientEnum::Keycloak(client));
+
+    let app_url_str = std::env::var("TAPLOCK_APP_URL").unwrap_or_default();
+    let app_url = Strings::from(app_url_str).into_robj();
 
     Ok(OAuth2Runtime {
         client,
@@ -232,7 +346,7 @@ fn initialize_keycloak_runtime(
         use_refresh_token,
     ))?;
 
-    let client = Arc::from(client);
+    let client = Arc::new(ClientEnum::Keycloak(client));
 
     let app_url = Strings::from(app_url).into_robj();
 
@@ -253,8 +367,11 @@ extendr_module! {
     fn get_taplock_callback_endpoint;
     fn parse_cookies;
     fn initialize_google_runtime;
+    fn initialize_google_from_env_runtime;
     fn initialize_entra_id_runtime;
+    fn initialize_entra_id_from_env_runtime;
     fn initialize_keycloak_runtime;
+    fn initialize_keycloak_from_env_runtime;
     impl AsyncFuture;
     impl FutureResult;
     impl OAuth2Runtime;

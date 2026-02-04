@@ -31,3 +31,22 @@ new_keycloak_config <- function(
   }
   return(runtime_result)
 }
+
+#' @title Create a new keycloak_config object from environment variables
+#' @description Creates a new keycloak_config object using environment variables:
+#' - TAPLOCK_KEYCLOAK_URL
+#' - TAPLOCK_KEYCLOAK_REALM
+#' - TAPLOCK_KEYCLOAK_CLIENT_ID
+#' - TAPLOCK_KEYCLOAK_CLIENT_SECRET
+#' - TAPLOCK_APP_URL
+#' - TAPLOCK_KEYCLOAK_USE_REFRESH_TOKEN (Optional)
+#'
+#' @return A keycloak_config object
+#' @export
+new_keycloak_config_from_env <- function() {
+  runtime_result <- initialize_keycloak_from_env_runtime()
+  if (is_error(runtime_result)) {
+    rlang::abort(runtime_result$value)
+  }
+  return(runtime_result)
+}

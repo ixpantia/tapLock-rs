@@ -163,6 +163,60 @@ fn initialize_keycloak<'p>(
 }
 
 #[pyfunction]
+fn initialize_google_from_env<'p>(py: Python<'p>) -> PyResult<Bound<'p, PyAny>> {
+    pyo3_async_runtimes::tokio::future_into_py(py, async move {
+        let client = google::GoogleOAuth2Client::from_env()
+            .await
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+
+        let app_url = std::env::var("TAPLOCK_APP_URL").unwrap_or_default();
+
+        let taplock_client = TapLockClient {
+            client: Arc::new(client),
+            app_url,
+        };
+
+        Ok(taplock_client)
+    })
+}
+
+#[pyfunction]
+fn initialize_entra_id_from_env<'p>(py: Python<'p>) -> PyResult<Bound<'p, PyAny>> {
+    pyo3_async_runtimes::tokio::future_into_py(py, async move {
+        let client = entra_id::AzureADOAuth2Client::from_env()
+            .await
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+
+        let app_url = std::env::var("TAPLOCK_APP_URL").unwrap_or_default();
+
+        let taplock_client = TapLockClient {
+            client: Arc::new(client),
+            app_url,
+        };
+
+        Ok(taplock_client)
+    })
+}
+
+#[pyfunction]
+fn initialize_keycloak_from_env<'p>(py: Python<'p>) -> PyResult<Bound<'p, PyAny>> {
+    pyo3_async_runtimes::tokio::future_into_py(py, async move {
+        let client = keycloak::KeycloakClient::from_env()
+            .await
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+
+        let app_url = std::env::var("TAPLOCK_APP_URL").unwrap_or_default();
+
+        let taplock_client = TapLockClient {
+            client: Arc::new(client),
+            app_url,
+        };
+
+        Ok(taplock_client)
+    })
+}
+
+#[pyfunction]
 fn get_access_token_cookie_name() -> &'static str {
     ACCESS_TOKEN_COOKIE_NAME
 }
@@ -189,9 +243,15 @@ mod taplock {
     #[pymodule_export]
     use super::initialize_entra_id;
     #[pymodule_export]
+    use super::initialize_entra_id_from_env;
+    #[pymodule_export]
     use super::initialize_google;
     #[pymodule_export]
+    use super::initialize_google_from_env;
+    #[pymodule_export]
     use super::initialize_keycloak;
+    #[pymodule_export]
+    use super::initialize_keycloak_from_env;
     #[pymodule_export]
     use super::TapLockClient;
 }

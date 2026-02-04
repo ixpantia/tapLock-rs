@@ -35,12 +35,15 @@ pak::pak("ixpantia/tapLock")
 ``` r
 library(taplock)
 
-auth_config <- new_openid_config(
-  provider = "google",
+# You can initialize with explicit credentials:
+auth_config <- new_google_config(
   client_id = Sys.getenv("CLIENT_ID"),
   client_secret = Sys.getenv("CLIENT_SECRET"),
   app_url = Sys.getenv("APP_URL")
 )
+
+# Or initialize directly from environment variables:
+# auth_config <- new_google_config_from_env()
 ```
 
 ### 2. Secure your Shiny application
@@ -97,7 +100,19 @@ shinyApp(ui, server) |>
 
 ## Authentication providers
 
-tapLock supports the following authentication providers:
+tapLock supports several providers out of the box. You can initialize them manually or from environment variables for easier configuration.
+
+### Environment Variable Initialization
+
+For ease of use, you can call `new_*_config_from_env()` which will look for the following variables:
+
+| Provider | Method | Environment Variables |
+|----------|--------|-----------------------|
+| **Google** | `new_google_config_from_env()` | `TAPLOCK_GOOGLE_CLIENT_ID`, `TAPLOCK_GOOGLE_CLIENT_SECRET`, `TAPLOCK_APP_URL`, `TAPLOCK_GOOGLE_USE_REFRESH_TOKEN` (opt) |
+| **Entra ID** | `new_entra_id_config_from_env()` | `TAPLOCK_ENTRA_ID_CLIENT_ID`, `TAPLOCK_ENTRA_ID_CLIENT_SECRET`, `TAPLOCK_ENTRA_ID_TENANT_ID`, `TAPLOCK_APP_URL`, `TAPLOCK_ENTRA_ID_USE_REFRESH_TOKEN` (opt) |
+| **Keycloak** | `new_keycloak_config_from_env()` | `TAPLOCK_KEYCLOAK_URL`, `TAPLOCK_KEYCLOAK_REALM`, `TAPLOCK_KEYCLOAK_CLIENT_ID`, `TAPLOCK_KEYCLOAK_CLIENT_SECRET`, `TAPLOCK_APP_URL`, `TAPLOCK_KEYCLOAK_USE_REFRESH_TOKEN` (opt) |
+
+### Supported Providers
 
 - [Google](https://developers.google.com/identity/protocols/oauth2/openid-connect)
 - [Microsoft Entra ID](https://www.microsoft.com/en-us/security/business/identity-access/microsoft-entra-id)
