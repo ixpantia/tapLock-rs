@@ -34,7 +34,7 @@ type KeycloakClientFull = Client<
     oauth2::EndpointSet,
 >;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct KeycloakOAuth2Client {
     reqwest_client: reqwest::Client,
     client: KeycloakClientFull,
@@ -46,6 +46,56 @@ pub struct KeycloakOAuth2Client {
 impl KeycloakOAuth2Client {
     fn get_jwk(&self, kid: &str) -> Option<jsonwebtoken::jwk::Jwk> {
         self.jwks_client.get_key(kid)
+    }
+    /// Initializes a Keycloak client from environment variables
+    ///
+    /// - TAPLOCK_KEYCLOAK_URL (Base URL of the Keycloak server)
+    /// - TAPLOCK_KEYCLOAK_REALM (The realm to use)
+    /// - TAPLOCK_KEYCLOAK_CLIENT_ID (OAuth2 client ID)
+    /// - TAPLOCK_KEYCLOAK_CLIENT_SECRET (OAuth2 client secret)
+    /// - TAPLOCK_APP_URL (Base URL of this application for redirects)
+    /// - TAPLOCK_KEYCLOAK_USE_REFRESH_TOKEN (Optional, "true" or "false", defaults to true)
+    ///
+    /// The error returns a vector of strings, either listing missing environment variables
+    /// or describing an error during client initialization.
+    pub async fn from_env() -> Result<Self, TapLockError> {
+        let mut missing_env_vars = Vec::new();
+
+        let get_env_var = |name: &str, missing: &mut Vec<String>| {
+            std::env::var(name).unwrap_or_else(|_| {
+                missing.push(name.to_string());
+                String::new() // Return an empty string as a placeholder if not found
+            })
+        };
+
+        let keycloak_url = get_env_var("TAPLOCK_KEYCLOAK_URL", &mut missing_env_vars);
+        let keycloak_realm = get_env_var("TAPLOCK_KEYCLOAK_REALM", &mut missing_env_vars);
+        let client_id = get_env_var("TAPLOCK_KEYCLOAK_CLIENT_ID", &mut missing_env_vars);
+        let client_secret = get_env_var("TAPLOCK_KEYCLOAK_CLIENT_SECRET", &mut missing_env_vars);
+        let app_url = get_env_var("TAPLOCK_APP_URL", &mut missing_env_vars);
+
+        let use_refresh_token = match std::env::var("TAPLOCK_KEYCLOAK_USE_REFRESH_TOKEN") {
+            Ok(s) => s.parse::<bool>().unwrap_or_else(|_| {
+                // Log a warning if parsing fails, but don't add to missing_env_vars as it was present.
+                eprintln!("Warning: TAPLOCK_KEYCLOAK_USE_REFRESH_TOKEN value '{}' is not a valid boolean. Defaulting to false.", s);
+                true
+            }),
+            Err(_) => true, // Default to false if variable is not set
+        };
+
+        if !missing_env_vars.is_empty() {
+            return Err(TapLockError::MissingEnv(missing_env_vars));
+        }
+
+        build_oauth2_state_keycloak(
+            &client_id,
+            &client_secret,
+            &app_url,
+            &keycloak_url,
+            &keycloak_realm,
+            use_refresh_token,
+        )
+        .await
     }
 }
 

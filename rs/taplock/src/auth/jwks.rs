@@ -5,7 +5,7 @@ use tokio::sync::Mutex as AsyncMutex;
 
 use crate::error::TapLockError;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct JwksClient {
     url: String,
     // Use std::sync::RwLock for fast, synchronous reads during validation
