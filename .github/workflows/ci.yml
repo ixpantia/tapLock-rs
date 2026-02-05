@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  RUST_VERSION: "1.85"
+
+jobs:
+  rust-tests:
+    name: Rust Core Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+      - name: Rust Check & Test
+        run: |
+          cargo check --package taplock-rs
+          cargo test --package taplock-rs
+
+  python-tests:
+    name: Python Wrapper
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: py/taplock
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install build tools
+        run: pip install maturin fastapi
+      - name: Build and Install Python Wrapper
+        run: pip install .
+      - name: Import test
+        run: python -c "import taplock; print('Python wrapper imported successfully')"
+        working-directory: .
+
+  r-tests:
+    name: R Wrapper
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: r/taplock
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config libcurl4-openssl-dev
+      - name: Install R dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          working-directory: r/taplock
+          extra-packages: |
+            any::rcmdcheck
+            any::remotes
+      - name: Install rextendr
+        run: |
+          Rscript -e "install.packages(c('rextendr', 'devtools'))"
+      - name: Build R package
+        run: Rscript -e "devtools::build('.', binary = FALSE)"
+      - name: Run R CMD check
+        run: R CMD check r/tapLock_*.tar.gz
