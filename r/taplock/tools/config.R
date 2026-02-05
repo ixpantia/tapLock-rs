@@ -96,13 +96,40 @@ if (file.exists(mv_ofp)) {
 # read as a single string
 mv_txt <- readLines(mv_fp)
 
+# detect OpenSSL if not on windows or wasm
+.extra_libs <- ""
+if (!is_windows && !is_wasm) {
+  # try pkg-config first
+  suppressWarnings({
+    pc_libs <- system2(
+      "pkg-config",
+      c("--libs", "openssl"),
+      stdout = TRUE,
+      stderr = NULL
+    )
+  })
+
+  if (length(pc_libs) > 0 && nzchar(pc_libs)) {
+    .extra_libs <- pc_libs
+  } else {
+    # fallback to standard names if pkg-config fails
+    .extra_libs <- "-lssl -lcrypto"
+  }
+
+  # On Linux, we often need to link against util and rt
+  if (identical(Sys.info()[["sysname"]], "Linux")) {
+    .extra_libs <- paste(.extra_libs, "-lutil -lrt")
+  }
+}
+
 # replace placeholder values
 new_txt <- gsub("@CRAN_FLAGS@", .cran_flags, mv_txt) |>
   gsub("@PROFILE@", .profile, x = _) |>
   gsub("@CLEAN_TARGET@", .clean_targets, x = _) |>
   gsub("@LIBDIR@", .libdir, x = _) |>
   gsub("@TARGET@", .target, x = _) |>
-  gsub("@PANIC_EXPORTS@", .panic_exports, x = _)
+  gsub("@PANIC_EXPORTS@", .panic_exports, x = _) |>
+  gsub("@EXTRA_LIBS@", .extra_libs, x = _)
 
 message("Writing `", mv_ofp, "`.")
 con <- file(mv_ofp, open = "wb")

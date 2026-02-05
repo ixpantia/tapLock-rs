@@ -26,10 +26,8 @@ file.copy(
 top_cargo_toml <- "src/Cargo.toml"
 lines <- readLines(top_cargo_toml)
 # change the path to the R package's Rust code
-lines <- gsub("r/ixaccess/src/rust", "rust", lines, fixed = TRUE)
-lines <- gsub('"py/ixaccess",', "", lines, fixed = TRUE)
+lines <- gsub("r/taplock/src/rust", "rust", lines, fixed = TRUE)
+lines <- gsub('"py/taplock",', "", lines, fixed = TRUE)
 print(lines)
 # remove unnecessary workspace members
 writeLines(lines, top_cargo_toml)
-
-rextendr::vendor_pkgs()
