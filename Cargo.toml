@@ -19,7 +19,7 @@ thiserror = "2.0.17"
 tokio = "1.48.0"
 tracing = "0.1.43"
 url = "2.5.7"
-extendr-api = { version = '0.8.1' }
+extendr-api = { version = '0.8.1', features = ["result_condition"] }
 
 
 [profile.release]
