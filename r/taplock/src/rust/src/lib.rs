@@ -176,10 +176,7 @@ impl OAuth2Runtime {
     // Should return a list with the deocoded token in the form of a list
     // or an error if the token is invalid
     fn decode_token(&self, token: String) -> Result<Robj> {
-        let res = self
-            .client
-            .decode_access_token(token)
-            .map_err(|_| Error::from("Hello".to_string()))?;
+        let res = self.client.decode_access_token(token)?;
         Ok(res.into_robj())
     }
 
