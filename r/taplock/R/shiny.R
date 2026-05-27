@@ -110,7 +110,6 @@ internal_add_auth_layers <- function(config, tower) {
           )
         )
       }
-      print(req$TOKEN)
       if (is_error(req$TOKEN)) {
         if (req$PATH_INFO == "/") {
           return(
