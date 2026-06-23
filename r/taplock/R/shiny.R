@@ -69,6 +69,7 @@ internal_add_auth_layers <- function(config, tower) {
       if (
         is_error(req$TOKEN) && shiny::isTruthy(cookies[[refresh_cookie_name]])
       ) {
+        print(req$TOKEN)
         # Ask for a new token using the refresh_token
         token <- request_token_refresh(config, cookies[[refresh_cookie_name]])
         return(
@@ -113,6 +114,7 @@ internal_add_auth_layers <- function(config, tower) {
         )
       }
       if (is_error(req$TOKEN)) {
+        print(req$TOKEN)
         if (req$PATH_INFO == "/") {
           return(
             shiny::httpResponse(
