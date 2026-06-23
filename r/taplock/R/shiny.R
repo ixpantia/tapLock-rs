@@ -28,6 +28,7 @@ internal_add_auth_layers <- function(config, tower) {
             )
           },
           onRejected = function(e) {
+            print(e)
             shiny::httpResponse(
               status = 302,
               headers = list(
@@ -92,6 +93,7 @@ internal_add_auth_layers <- function(config, tower) {
               return(response)
             },
             onRejected = function(e) {
+              print(e)
               shiny::httpResponse(
                 status = 302,
                 headers = list(
