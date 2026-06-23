@@ -79,7 +79,9 @@ fn parse_cookies(cookie_string: Option<&str>) -> List {
         for cookie_result in cookie::Cookie::split_parse(s) {
             match cookie_result {
                 Ok(cookie) => cookies.push((cookie.name().to_string(), cookie.value().into_robj())),
-                Err(_e) => {}
+                Err(e) => {
+                    reprintln!("Error parsing cookie: {e}");
+                }
             }
         }
     }

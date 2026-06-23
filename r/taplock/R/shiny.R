@@ -59,6 +59,7 @@ internal_add_auth_layers <- function(config, tower) {
 
       # Get the HTTP cookies from the request
       cookies <- parse_cookies(req$HTTP_COOKIE)
+      print(cookies)
       req$PARSED_COOKIES <- cookies
 
       # If the user requests the root path, we'll check if they have
