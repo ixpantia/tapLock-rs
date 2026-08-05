@@ -3,7 +3,7 @@ use super::{ACCESS_TOKEN_COOKIE_NAME, REFRESH_TOKEN_COOKIE_NAME, TAPLOCK_CALLBAC
 
 use axum::{
     extract::{Query, Request, State},
-    http::{header::SET_COOKIE, HeaderValue, StatusCode},
+    http::{header::AUTHORIZATION, header::SET_COOKIE, HeaderValue, StatusCode},
     middleware::Next,
     response::{IntoResponse, Redirect, Response},
 };
@@ -115,7 +115,16 @@ fn remove_auth_cookie<'a>(name: &'a str) -> Cookie<'a> {
     Cookie::build(name).removal().path("/").build()
 }
 
-/// Axum middleware that handles OAuth2 authentication via cookies.
+// Helper to extract bearer token from Authorization header
+fn extract_bearer_token(headers: &axum::http::HeaderMap) -> Option<String> {
+    headers
+        .get(AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .filter(|value| value.starts_with("Bearer "))
+        .map(|value| value[7..].to_string())
+}
+
+/// Axum middleware that handles OAuth2 authentication via cookies or Authorization header.
 pub async fn auth_middleware<S, C>(
     State(state): State<S>,
     jar: CookieJar,
@@ -135,15 +144,20 @@ where
 
     let client = C::from_ref(&state);
 
+    // Try to get access token from cookie first, then from Authorization header
     let access_token_cookie_val = jar
         .get(ACCESS_TOKEN_COOKIE_NAME)
         .map(|c| c.value().to_string());
+    let access_token_header_val = extract_bearer_token(req.headers());
     let refresh_token_cookie_val = jar
         .get(REFRESH_TOKEN_COOKIE_NAME)
         .map(|c| c.value().to_string());
 
-    // --- 1. Validate Access Token ---
-    if let Some(access_token) = access_token_cookie_val {
+    // Prefer cookie token over header token (cookie is set by our login flow)
+    let access_token = access_token_cookie_val.or(access_token_header_val);
+
+    // --- 1. Validate Access Token (from cookie or Authorization header) ---
+    if let Some(access_token) = access_token {
         match client.decode_access_token(access_token) {
             Ok(token_info) => {
                 req.extensions_mut().insert(token_info);
