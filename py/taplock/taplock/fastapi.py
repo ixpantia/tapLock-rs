@@ -119,6 +119,13 @@ class TapLock:
         return {"message": "Logged out"}
 
     # --- Dependency ---
+    def _extract_bearer_token(self, request: Request) -> Optional[str]:
+        """Extract Bearer token from Authorization header."""
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            return auth_header[7:]  # Remove "Bearer " prefix
+        return None
+
     async def _handle_request(
         self,
         request: Request,
@@ -126,7 +133,9 @@ class TapLock:
         return_to: Optional[str] = None
     ) -> Dict[str, Any]:
         self._check_init()
-        access_token = request.cookies.get(self.access_token_cookie)
+        
+        # Try to get access token from cookie first, then from Authorization header
+        access_token = request.cookies.get(self.access_token_cookie) or self._extract_bearer_token(request)
 
         if access_token:
             try:
