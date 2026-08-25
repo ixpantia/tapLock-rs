@@ -41,7 +41,5 @@ test_that("Skips cookies with invalid URL encoding", {
   # so it should be skipped entirely.
   cookie <- "foo=%E0%A4%A"
   expected <- list()
-  # We need to do this for the check to work
-  names(expected) <- character(0)
   expect_equal(parse_cookies(cookie), expected)
 })

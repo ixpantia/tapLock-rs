@@ -7,6 +7,7 @@
 #' @param client_secret The client secret for the app
 #' @param app_url The URL for the app
 #' @param use_refresh_token Enable the use of refresh tokens
+#' @param validate_audience Whether to validate the token audience against the client ID
 #'
 #' @return A keycloak_config object
 #' @export
@@ -16,7 +17,8 @@ new_keycloak_config <- function(
   client_id,
   client_secret,
   app_url,
-  use_refresh_token = TRUE
+  use_refresh_token = TRUE,
+  validate_audience = TRUE
 ) {
   runtime_result <- initialize_keycloak_runtime(
     client_id = client_id,
@@ -24,7 +26,8 @@ new_keycloak_config <- function(
     app_url = app_url,
     base_url = base_url,
     realm = realm,
-    use_refresh_token = use_refresh_token
+    use_refresh_token = use_refresh_token,
+    validate_audience = validate_audience
   )
   if (is_error(runtime_result)) {
     rlang::abort(runtime_result$value)
@@ -40,6 +43,7 @@ new_keycloak_config <- function(
 #' - TAPLOCK_KEYCLOAK_CLIENT_SECRET
 #' - TAPLOCK_APP_URL
 #' - TAPLOCK_KEYCLOAK_USE_REFRESH_TOKEN (Optional)
+#' - TAPLOCK_KEYCLOAK_VALIDATE_AUDIENCE (Optional)
 #'
 #' @return A keycloak_config object
 #' @export

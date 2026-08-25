@@ -10,7 +10,8 @@ new_keycloak_config(
   client_id,
   client_secret,
   app_url,
-  use_refresh_token = TRUE
+  use_refresh_token = TRUE,
+  validate_audience = TRUE
 )
 }
 \arguments{
@@ -25,6 +26,8 @@ new_keycloak_config(
 \item{app_url}{The URL for the app}
 
 \item{use_refresh_token}{Enable the use of refresh tokens}
+
+\item{validate_audience}{Whether to validate the token audience against the client ID}
 }
 \value{
 A keycloak_config object
