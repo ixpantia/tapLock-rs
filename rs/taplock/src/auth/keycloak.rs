@@ -120,9 +120,8 @@ fn decode_access_token(
     let algo = jwt_header.alg;
     let decoding_key = client.get_jwk(&kid).ok_or(TapLockError::KidNotFound)?;
     let mut validation = Validation::new(algo);
-    if client.validate_audience {
-        validation.set_audience(&[&client.client_id]);
-    }
+    validation.validate_aud = client.validate_audience;
+    validation.set_audience(&[&client.client_id]);
     let val = decode::<serde_json::Value>(
         token_trim,
         &DecodingKey::from_jwk(&decoding_key)?,
@@ -147,9 +146,8 @@ async fn decode_token_and_maybe_refresh_jwks(
     let decoding_key = client.jwks_client.get_key_with_refresh(&kid).await?;
     let algo = jwt_header.alg;
     let mut validation = Validation::new(algo);
-    if client.validate_audience {
-        validation.set_audience(&[&client.client_id]);
-    }
+    validation.validate_aud = client.validate_audience;
+    validation.set_audience(&[&client.client_id]);
     let val = decode::<serde_json::Value>(
         token_trim,
         &DecodingKey::from_jwk(&decoding_key)?,
