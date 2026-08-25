@@ -15,4 +15,4 @@ tokio = { workspace = true, features = ["rt-multi-thread"] }
 extendr-api = { workspace = true }
 serde_json = { workspace = true }
 async-trait = { workspace = true }
-cookie = { workspace = true }
+cookie = { workspace = true, features = ["percent-encode"] }

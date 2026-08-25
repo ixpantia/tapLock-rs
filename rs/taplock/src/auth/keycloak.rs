@@ -41,6 +41,7 @@ pub struct KeycloakOAuth2Client {
     client_id: String,
     jwks_client: JwksClient,
     use_refresh_token: bool,
+    validate_audience: bool,
 }
 
 impl KeycloakOAuth2Client {
@@ -55,6 +56,7 @@ impl KeycloakOAuth2Client {
     /// - TAPLOCK_KEYCLOAK_CLIENT_SECRET (OAuth2 client secret)
     /// - TAPLOCK_APP_URL (Base URL of this application for redirects)
     /// - TAPLOCK_KEYCLOAK_USE_REFRESH_TOKEN (Optional, "true" or "false", defaults to true)
+    /// - TAPLOCK_KEYCLOAK_VALIDATE_AUDIENCE (Optional, "true" or "false", defaults to true)
     ///
     /// The error returns a vector of strings, either listing missing environment variables
     /// or describing an error during client initialization.
@@ -83,6 +85,14 @@ impl KeycloakOAuth2Client {
             Err(_) => true, // Default to false if variable is not set
         };
 
+        let validate_audience = match std::env::var("TAPLOCK_KEYCLOAK_VALIDATE_AUDIENCE") {
+            Ok(s) => s.parse::<bool>().unwrap_or_else(|_| {
+                eprintln!("Warning: TAPLOCK_KEYCLOAK_VALIDATE_AUDIENCE value '{}' is not a valid boolean. Defaulting to true.", s);
+                true
+            }),
+            Err(_) => true,
+        };
+
         if !missing_env_vars.is_empty() {
             return Err(TapLockError::MissingEnv(missing_env_vars));
         }
@@ -94,6 +104,7 @@ impl KeycloakOAuth2Client {
             &keycloak_url,
             &keycloak_realm,
             use_refresh_token,
+            validate_audience,
         )
         .await
     }
@@ -109,7 +120,9 @@ fn decode_access_token(
     let algo = jwt_header.alg;
     let decoding_key = client.get_jwk(&kid).ok_or(TapLockError::KidNotFound)?;
     let mut validation = Validation::new(algo);
-    validation.set_audience(&[&client.client_id]);
+    if client.validate_audience {
+        validation.set_audience(&[&client.client_id]);
+    }
     let val = decode::<serde_json::Value>(
         token_trim,
         &DecodingKey::from_jwk(&decoding_key)?,
@@ -134,7 +147,9 @@ async fn decode_token_and_maybe_refresh_jwks(
     let decoding_key = client.jwks_client.get_key_with_refresh(&kid).await?;
     let algo = jwt_header.alg;
     let mut validation = Validation::new(algo);
-    validation.set_audience(&[&client.client_id]);
+    if client.validate_audience {
+        validation.set_audience(&[&client.client_id]);
+    }
     let val = decode::<serde_json::Value>(
         token_trim,
         &DecodingKey::from_jwk(&decoding_key)?,
@@ -155,6 +170,7 @@ pub async fn build_oauth2_state_keycloak(
     base_url: &str,
     realm: &str,
     use_refresh_token: bool,
+    validate_audience: bool,
 ) -> std::result::Result<KeycloakOAuth2Client, TapLockError> {
     let base_url = base_url.trim_end_matches('/');
     let auth_url = format!("{base_url}/realms/{realm}/protocol/openid-connect/auth");
@@ -179,6 +195,7 @@ pub async fn build_oauth2_state_keycloak(
         jwks_client,
         client_id: client_id.to_string(),
         use_refresh_token,
+        validate_audience,
     })
 }
 

@@ -26,7 +26,7 @@ initialize_entra_id_runtime <- function(client_id, client_secret, app_url, tenan
 
 initialize_entra_id_from_env_runtime <- function() .Call(wrap__initialize_entra_id_from_env_runtime)
 
-initialize_keycloak_runtime <- function(client_id, client_secret, app_url, base_url, realm, use_refresh_token) .Call(wrap__initialize_keycloak_runtime, client_id, client_secret, app_url, base_url, realm, use_refresh_token)
+initialize_keycloak_runtime <- function(client_id, client_secret, app_url, base_url, realm, use_refresh_token, validate_audience) .Call(wrap__initialize_keycloak_runtime, client_id, client_secret, app_url, base_url, realm, use_refresh_token, validate_audience)
 
 initialize_keycloak_from_env_runtime <- function() .Call(wrap__initialize_keycloak_from_env_runtime)
 

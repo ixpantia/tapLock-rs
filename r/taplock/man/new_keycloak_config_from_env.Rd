@@ -18,5 +18,6 @@ Creates a new keycloak_config object using environment variables:
 \item TAPLOCK_KEYCLOAK_CLIENT_SECRET
 \item TAPLOCK_APP_URL
 \item TAPLOCK_KEYCLOAK_USE_REFRESH_TOKEN (Optional)
+\item TAPLOCK_KEYCLOAK_VALIDATE_AUDIENCE (Optional)
 }
 }

@@ -76,15 +76,24 @@ fn parse_cookies(cookie_string: Option<&str>) -> List {
     let mut cookies: Vec<(String, Robj)> = Vec::new();
 
     if let Some(s) = cookie_string {
-        for cookie_result in cookie::Cookie::split_parse(s) {
+        for cookie_result in cookie::Cookie::split_parse_encoded(s) {
             match cookie_result {
-                Ok(cookie) => cookies.push((cookie.name().to_string(), cookie.value().into_robj())),
+                Ok(cookie) => {
+                    if cookie.name().is_empty() {
+                        continue;
+                    }
+                    cookies.push((cookie.name().to_string(), cookie.value().into_robj()))
+                }
                 Err(_e) => {}
             }
         }
     }
 
-    List::from_pairs(cookies)
+    if cookies.is_empty() {
+        List::new(0)
+    } else {
+        List::from_pairs(cookies)
+    }
 }
 
 #[extendr]
@@ -327,6 +336,7 @@ fn initialize_keycloak_runtime(
     base_url: &str,
     realm: &str,
     use_refresh_token: bool,
+    validate_audience: bool,
 ) -> Result<OAuth2Runtime> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(1)
@@ -341,6 +351,7 @@ fn initialize_keycloak_runtime(
         base_url,
         realm,
         use_refresh_token,
+        validate_audience,
     ))?;
 
     let client = Arc::new(ClientEnum::Keycloak(client));

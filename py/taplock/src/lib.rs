@@ -188,6 +188,7 @@ fn initialize_keycloak<'p>(
     base_url: String,
     realm: String,
     use_refresh_token: bool,
+    validate_audience: bool,
 ) -> PyResult<Bound<'p, PyAny>> {
     let app_url_clone = app_url.clone();
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
@@ -198,6 +199,7 @@ fn initialize_keycloak<'p>(
             &base_url,
             &realm,
             use_refresh_token,
+            validate_audience,
         )
         .await
         .map_err(|e| PyValueError::new_err(e.to_string()))?;
