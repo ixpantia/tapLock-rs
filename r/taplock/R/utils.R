@@ -18,11 +18,18 @@ remove_bearer <- function(token) {
 #'
 #' @param key A string containing the cookie key
 #' @param value A string containing the cookie value
+#' @param domain An optional string containing the cookie domain.
+#'   If `NULL` (the default), the cookie is host-only.
 #'
 #' @return A string containing the cookie
 #' @keywords internal
-build_cookie <- function(key, value) {
-  glue::glue("{key}={value}; path=/; SameSite=Lax; HttpOnly")
+build_cookie <- function(key, value, domain = NULL) {
+  domain_part <- if (is.null(domain) || length(domain) == 0 || domain == "") {
+    ""
+  } else {
+    glue::glue("; Domain={domain}")
+  }
+  glue::glue("{key}={value}; path=/; SameSite=Lax; HttpOnly{domain_part}")
 }
 
 map_null <- function(x, f) {

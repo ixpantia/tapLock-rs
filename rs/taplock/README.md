@@ -88,7 +88,27 @@ async fn main() {
 }
 ```
 
+If your application is served on multiple subdomains, you can configure the domain that the authentication cookies are attached to via `TapLockConfig`:
+
+```rust
+use taplock::auth::axum::{TapLockConfig, TapLockRouterExt};
+
+let config = TapLockConfig::builder()
+    .cookie_domain("example.com")
+    .build();
+
+Router::new()
+    .route("/dashboard", get(protected_handler))
+    .taplock_auth_with_config::<GoogleOAuth2Client>(client, config);
+```
+
+When no domain is set explicitly, the value of the `TAPLOCK_COOKIE_DOMAIN` environment variable is used. If neither is set, the cookies are host-only (the browser default).
+
 ## Environment Variables
+
+| Variable | Purpose |
+|----------|---------|
+| `TAPLOCK_COOKIE_DOMAIN` | Optional. Domain attached to the authentication cookies. Falls back to host-only when unset. Applies when using the Axum integration or the cookie-building helpers. |
 
 | Provider | Method | Environment Variables |
 |----------|--------|-----------------------|

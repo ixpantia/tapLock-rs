@@ -98,6 +98,18 @@ shinyApp(ui, server) |>
   tower::build_tower()
 ```
 
+If your application is served across multiple subdomains, you can attach the
+authentication cookies to a specific domain by passing `cookie_domain` to
+`add_auth_layers()`. When omitted, it falls back to the `TAPLOCK_COOKIE_DOMAIN`
+environment variable; if that is also unset, the cookies are host-only.
+
+``` r
+shinyApp(ui, server) |>
+  tower::create_tower() |>
+  tapLock::add_auth_layers(auth_config, cookie_domain = "example.com") |>
+  tower::build_tower()
+```
+
 ## Authentication providers
 
 tapLock supports several providers out of the box. You can initialize them manually or from environment variables for easier configuration.
@@ -111,6 +123,10 @@ For ease of use, you can call `new_*_config_from_env()` which will look for the 
 | **Google** | `new_google_config_from_env()` | `TAPLOCK_GOOGLE_CLIENT_ID`, `TAPLOCK_GOOGLE_CLIENT_SECRET`, `TAPLOCK_APP_URL`, `TAPLOCK_GOOGLE_USE_REFRESH_TOKEN` (opt) |
 | **Entra ID** | `new_entra_id_config_from_env()` | `TAPLOCK_ENTRA_ID_CLIENT_ID`, `TAPLOCK_ENTRA_ID_CLIENT_SECRET`, `TAPLOCK_ENTRA_ID_TENANT_ID`, `TAPLOCK_APP_URL`, `TAPLOCK_ENTRA_ID_USE_REFRESH_TOKEN` (opt) |
 | **Keycloak** | `new_keycloak_config_from_env()` | `TAPLOCK_KEYCLOAK_URL`, `TAPLOCK_KEYCLOAK_REALM`, `TAPLOCK_KEYCLOAK_CLIENT_ID`, `TAPLOCK_KEYCLOAK_CLIENT_SECRET`, `TAPLOCK_APP_URL`, `TAPLOCK_KEYCLOAK_USE_REFRESH_TOKEN` (opt), `TAPLOCK_KEYCLOAK_VALIDATE_AUDIENCE` (opt) |
+
+The `TAPLOCK_COOKIE_DOMAIN` environment variable is also honored (see the
+example above) to set the domain the authentication cookies are attached to
+when `cookie_domain` is not passed to `add_auth_layers()`.
 
 ### Supported Providers
 

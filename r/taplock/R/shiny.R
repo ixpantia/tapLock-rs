@@ -1,4 +1,4 @@
-internal_add_auth_layers <- function(config, tower) {
+internal_add_auth_layers <- function(config, tower, cookie_domain) {
   # Run functions to get endpoint and cookie names at the start
   login_endpoint <- get_taplock_callback_endpoint()
   access_cookie_name <- get_access_token_cookie_name()
@@ -18,11 +18,13 @@ internal_add_auth_layers <- function(config, tower) {
                 Location = config$get_app_url(),
                 "Set-Cookie" = build_cookie(
                   access_cookie_name,
-                  add_bearer(token$access_token)
+                  add_bearer(token$access_token),
+                  cookie_domain
                 ),
                 "Set-Cookie" = build_cookie(
                   refresh_cookie_name,
-                  token$refresh_token
+                  token$refresh_token,
+                  cookie_domain
                 )
               )
             )
@@ -33,8 +35,8 @@ internal_add_auth_layers <- function(config, tower) {
               status = 302,
               headers = list(
                 Location = config$get_app_url(),
-                "Set-Cookie" = build_cookie(access_cookie_name, ""),
-                "Set-Cookie" = build_cookie(refresh_cookie_name, "")
+                "Set-Cookie" = build_cookie(access_cookie_name, "", cookie_domain),
+                "Set-Cookie" = build_cookie(refresh_cookie_name, "", cookie_domain)
               )
             )
           }
@@ -47,8 +49,8 @@ internal_add_auth_layers <- function(config, tower) {
           status = 302,
           headers = list(
             Location = config$get_app_url(),
-            "Set-Cookie" = build_cookie(access_cookie_name, ""),
-            "Set-Cookie" = build_cookie(refresh_cookie_name, "")
+            "Set-Cookie" = build_cookie(access_cookie_name, "", cookie_domain),
+            "Set-Cookie" = build_cookie(refresh_cookie_name, "", cookie_domain)
           )
         )
       )
@@ -69,7 +71,6 @@ internal_add_auth_layers <- function(config, tower) {
       if (
         is_error(req$TOKEN) && shiny::isTruthy(cookies[[refresh_cookie_name]])
       ) {
-        print(req$TOKEN)
         # Ask for a new token using the refresh_token
         token <- request_token_refresh(config, cookies[[refresh_cookie_name]])
         return(
@@ -83,11 +84,13 @@ internal_add_auth_layers <- function(config, tower) {
                 list(
                   "Set-Cookie" = build_cookie(
                     access_cookie_name,
-                    add_bearer(token$access_token)
+                    add_bearer(token$access_token),
+                    cookie_domain
                   ),
                   "Set-Cookie" = build_cookie(
                     refresh_cookie_name,
-                    token$refresh_token
+                    token$refresh_token,
+                    cookie_domain
                   )
                 )
               )
@@ -101,11 +104,13 @@ internal_add_auth_layers <- function(config, tower) {
                   Location = get_login_url(config),
                   "Set-Cookie" = build_cookie(
                     access_cookie_name,
-                    ""
+                    "",
+                    cookie_domain
                   ),
                   "Set-Cookie" = build_cookie(
                     refresh_cookie_name,
-                    ""
+                    "",
+                    cookie_domain
                   )
                 )
               )
@@ -114,7 +119,6 @@ internal_add_auth_layers <- function(config, tower) {
         )
       }
       if (is_error(req$TOKEN)) {
-        print(req$TOKEN)
         if (req$PATH_INFO == "/") {
           return(
             shiny::httpResponse(
@@ -161,10 +165,20 @@ internal_add_auth_layers <- function(config, tower) {
 #'   after.
 #' @param tower A 'tower' object from the package 'tower'
 #' @param config An 'openid_config' object
+#' @param cookie_domain An optional string containing the domain to
+#'   attach the authentication cookies to. If omitted, it falls back to
+#'   the `TAPLOCK_COOKIE_DOMAIN` environment variable. If neither is set,
+#'   the cookies are host-only. Pass `NULL` to force the host-only default.
 #' @return A modified 'tower' object with authentication layers
 #' @export
-add_auth_layers <- function(tower, config) {
-  internal_add_auth_layers(config, tower)
+add_auth_layers <- function(tower, config, cookie_domain = NULL) {
+  if (is.null(cookie_domain) || length(cookie_domain) == 0) {
+    cookie_domain <- Sys.getenv("TAPLOCK_COOKIE_DOMAIN")
+  }
+  if (length(cookie_domain) == 0 || cookie_domain == "") {
+    cookie_domain <- NULL
+  }
+  internal_add_auth_layers(config, tower, cookie_domain)
 }
 
 #' @title Get the access token
