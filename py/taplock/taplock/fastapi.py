@@ -1,5 +1,6 @@
 
 from typing import Any, Callable, Dict, Optional
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
@@ -24,11 +25,14 @@ from .taplock import (
 
 
 class TapLock:
-    def __init__(self):
+    def __init__(self, cookie_domain: Optional[str] = None):
         self.client = TapLockClient
         self.access_token_cookie = get_access_token_cookie_name()
         self.refresh_token_cookie = get_refresh_token_cookie_name()
         self.callback_endpoint = get_taplock_callback_endpoint()
+
+        # Explicit argument takes precedence over the environment variable.
+        self.cookie_domain = cookie_domain or os.getenv("TAPLOCK_COOKIE_DOMAIN") or None
 
         # Create a router that pre-wires the auth endpoints
         self.router = APIRouter()
@@ -76,6 +80,7 @@ class TapLock:
             httponly=True,
             secure=True,
             samesite="lax",
+            domain=self.cookie_domain,
             max_age=300 # 5 minutes is plenty for a login flow
         )
         return response
@@ -108,14 +113,14 @@ class TapLock:
         self._set_cookies(redirect_response, token_data)
 
         # Clear the temporary return_to cookie
-        redirect_response.delete_cookie("taplock_return_to")
+        redirect_response.delete_cookie("taplock_return_to", domain=self.cookie_domain)
 
         return redirect_response
 
     async def logout(self, response: Response):
         """Clears the authentication cookies."""
-        response.delete_cookie(self.access_token_cookie)
-        response.delete_cookie(self.refresh_token_cookie)
+        response.delete_cookie(self.access_token_cookie, domain=self.cookie_domain)
+        response.delete_cookie(self.refresh_token_cookie, domain=self.cookie_domain)
         return {"message": "Logged out"}
 
     # --- Dependency ---
@@ -212,7 +217,8 @@ class TapLock:
                 value=access_token,
                 httponly=True,
                 secure=True,
-                samesite="lax"
+                samesite="lax",
+                domain=self.cookie_domain
             )
 
         if refresh_token:
@@ -221,7 +227,8 @@ class TapLock:
                 value=refresh_token,
                 httponly=True,
                 secure=True,
-                samesite="lax"
+                samesite="lax",
+                domain=self.cookie_domain
             )
 
 class TapLockMiddleware(BaseHTTPMiddleware):

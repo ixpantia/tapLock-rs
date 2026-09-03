@@ -4,12 +4,17 @@
 \alias{add_auth_layers}
 \title{Add authentication middle ware to a 'tower' object}
 \usage{
-add_auth_layers(tower, config)
+add_auth_layers(tower, config, cookie_domain = NULL)
 }
 \arguments{
 \item{tower}{A 'tower' object from the package 'tower'}
 
 \item{config}{An 'openid_config' object}
+
+\item{cookie_domain}{An optional string containing the domain to
+attach the authentication cookies to. If omitted, it falls back to
+the `TAPLOCK_COOKIE_DOMAIN` environment variable. If neither is set,
+the cookies are host-only. Pass `NULL` to force the host-only default.}
 }
 \value{
 A modified 'tower' object with authentication layers

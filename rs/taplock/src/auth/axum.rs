@@ -2,7 +2,7 @@ use super::OAuth2Client;
 use super::{ACCESS_TOKEN_COOKIE_NAME, REFRESH_TOKEN_COOKIE_NAME, TAPLOCK_CALLBACK_ENDPOINT};
 
 use axum::{
-    extract::{Query, Request, State},
+    extract::{Extension, Query, Request, State},
     http::{header::AUTHORIZATION, header::SET_COOKIE, HeaderValue, StatusCode},
     middleware::Next,
     response::{IntoResponse, Redirect, Response},
@@ -33,6 +33,11 @@ pub enum RedirectStrategy {
 pub struct TapLockConfig {
     /// Strategy to use for redirection.
     pub redirect_strategy: RedirectStrategy,
+    /// Domain to attach to the authentication cookies.
+    ///
+    /// If `None`, the value of the `TAPLOCK_COOKIE_DOMAIN` environment variable is used
+    /// at build time; if that is also unset, the cookies are host-only (browser default).
+    pub cookie_domain: Option<String>,
 }
 
 impl TapLockConfig {
@@ -59,6 +64,7 @@ impl TapLockConfig {
 #[derive(Default)]
 pub struct TapLockConfigBuilder {
     strategy: RedirectStrategy,
+    cookie_domain: Option<String>,
 }
 
 impl TapLockConfigBuilder {
@@ -92,27 +98,51 @@ impl TapLockConfigBuilder {
         self
     }
 
+    /// Configures the cookie domain that authentication cookies are attached to.
+    ///
+    /// Takes precedence over the `TAPLOCK_COOKIE_DOMAIN` environment variable.
+    pub fn cookie_domain(mut self, domain: impl Into<String>) -> Self {
+        self.cookie_domain = Some(domain.into());
+        self
+    }
+
     /// Builds the `TapLockConfig`.
+    ///
+    /// If no cookie domain was set explicitly, falls back to the value of the
+    /// `TAPLOCK_COOKIE_DOMAIN` environment variable, if present.
     pub fn build(self) -> TapLockConfig {
+        let cookie_domain = if self.cookie_domain.is_some() {
+            self.cookie_domain
+        } else {
+            std::env::var("TAPLOCK_COOKIE_DOMAIN").ok().filter(|d| !d.is_empty())
+        };
         TapLockConfig {
             redirect_strategy: self.strategy,
+            cookie_domain,
         }
     }
 }
 
 // Helper to create a cookie for setting
-fn create_auth_cookie<'a>(name: &'a str, value: String) -> Cookie<'a> {
+fn create_auth_cookie<'a>(name: &'a str, value: String, domain: Option<String>) -> Cookie<'a> {
     let mut cookie = Cookie::new(name, value);
     cookie.set_path("/");
     cookie.set_http_only(true);
     cookie.set_same_site(SameSite::Lax);
     // cookie.set_secure(true); // Enable this if running over HTTPS in production
+    if let Some(domain) = domain {
+        cookie.set_domain(domain);
+    }
     cookie
 }
 
 // Helper to create a cookie for removal
-fn remove_auth_cookie<'a>(name: &'a str) -> Cookie<'a> {
-    Cookie::build(name).removal().path("/").build()
+fn remove_auth_cookie<'a>(name: &'a str, domain: Option<String>) -> Cookie<'a> {
+    let mut cookie = Cookie::build(name).removal().path("/").build();
+    if let Some(domain) = domain {
+        cookie.set_domain(domain);
+    }
+    cookie
 }
 
 // Helper to extract bearer token from Authorization header
@@ -143,6 +173,11 @@ where
     }
 
     let client = C::from_ref(&state);
+
+    let cookie_domain = req
+        .extensions()
+        .get::<TapLockConfig>()
+        .and_then(|config| config.cookie_domain.clone());
 
     // Try to get access token from cookie first, then from Authorization header
     let access_token_cookie_val = jar
@@ -180,7 +215,7 @@ where
                 let mut response = next.run(req).await;
 
                 let new_access_cookie =
-                    create_auth_cookie(ACCESS_TOKEN_COOKIE_NAME, token_response.access_token);
+                    create_auth_cookie(ACCESS_TOKEN_COOKIE_NAME, token_response.access_token, cookie_domain.clone());
                 response.headers_mut().append(
                     SET_COOKIE,
                     HeaderValue::from_str(&new_access_cookie.to_string()).unwrap(),
@@ -188,14 +223,13 @@ where
 
                 if let Some(new_refresh_token) = token_response.refresh_token {
                     let new_refresh_cookie =
-                        create_auth_cookie(REFRESH_TOKEN_COOKIE_NAME, new_refresh_token);
+                        create_auth_cookie(REFRESH_TOKEN_COOKIE_NAME, new_refresh_token, cookie_domain.clone());
                     response.headers_mut().append(
                         SET_COOKIE,
                         HeaderValue::from_str(&new_refresh_cookie.to_string()).unwrap(),
                     );
                 } else {
-                    let remove_old_refresh_cookie = remove_auth_cookie(REFRESH_TOKEN_COOKIE_NAME);
-                    response.headers_mut().append(
+                    let remove_old_refresh_cookie = remove_auth_cookie(REFRESH_TOKEN_COOKIE_NAME, cookie_domain.clone());                    response.headers_mut().append(
                         SET_COOKIE,
                         HeaderValue::from_str(&remove_old_refresh_cookie.to_string()).unwrap(),
                     );
@@ -219,13 +253,12 @@ where
         tracing::debug!("Authentication failed. Redirecting to login handler.");
         let mut response = Redirect::to(TAPLOCK_CALLBACK_ENDPOINT).into_response();
 
-        let remove_access_cookie = remove_auth_cookie(ACCESS_TOKEN_COOKIE_NAME);
+        let remove_access_cookie = remove_auth_cookie(ACCESS_TOKEN_COOKIE_NAME, cookie_domain.clone());
         response.headers_mut().append(
             SET_COOKIE,
             HeaderValue::from_str(&remove_access_cookie.to_string()).unwrap(),
         );
-        let remove_refresh_cookie = remove_auth_cookie(REFRESH_TOKEN_COOKIE_NAME);
-        response.headers_mut().append(
+        let remove_refresh_cookie = remove_auth_cookie(REFRESH_TOKEN_COOKIE_NAME, cookie_domain.clone());        response.headers_mut().append(
             SET_COOKIE,
             HeaderValue::from_str(&remove_refresh_cookie.to_string()).unwrap(),
         );
@@ -242,12 +275,16 @@ pub async fn login_handler<S, C>(
     State(state): State<S>,
     jar: CookieJar,
     Query(query): Query<AuthQuery>,
+    config: Option<Extension<TapLockConfig>>,
 ) -> Response
 where
     S: Send + Sync + 'static,
     C: OAuth2Client + axum::extract::FromRef<S> + 'static,
 {
     let client = C::from_ref(&state);
+    let cookie_domain = config
+        .as_ref()
+        .and_then(|config| config.0.cookie_domain.clone());
 
     if let Some(code) = query.code {
         match client.exchange_code(code).await {
@@ -256,10 +293,15 @@ where
                 jar = jar.add(create_auth_cookie(
                     ACCESS_TOKEN_COOKIE_NAME,
                     token_response.access_token,
+                    cookie_domain.clone(),
                 ));
 
                 if let Some(refresh_token) = token_response.refresh_token {
-                    jar = jar.add(create_auth_cookie(REFRESH_TOKEN_COOKIE_NAME, refresh_token));
+                    jar = jar.add(create_auth_cookie(
+                        REFRESH_TOKEN_COOKIE_NAME,
+                        refresh_token,
+                        cookie_domain.clone(),
+                    ));
                 }
 
                 (jar, Redirect::to("/")).into_response()
@@ -267,8 +309,16 @@ where
             Err(e) => {
                 tracing::error!("Failed to exchange code: {:?}", e);
                 let mut jar = jar;
-                jar = jar.remove(Cookie::build(ACCESS_TOKEN_COOKIE_NAME));
-                jar = jar.remove(Cookie::build(REFRESH_TOKEN_COOKIE_NAME));
+                let mut access_cookie =
+                    Cookie::build(ACCESS_TOKEN_COOKIE_NAME).removal().path("/").build();
+                let mut refresh_cookie =
+                    Cookie::build(REFRESH_TOKEN_COOKIE_NAME).removal().path("/").build();
+                if let Some(domain) = cookie_domain.clone() {
+                    access_cookie.set_domain(domain.clone());
+                    refresh_cookie.set_domain(domain);
+                }
+                jar = jar.remove(access_cookie);
+                jar = jar.remove(refresh_cookie);
                 (
                     jar,
                     (
@@ -308,7 +358,7 @@ where
     where
         C: OAuth2Client + axum::extract::FromRef<S> + 'static,
     {
-        self.taplock_auth_with_config::<C>(state, TapLockConfig::default())
+        self.taplock_auth_with_config::<C>(state, TapLockConfig::builder().build())
     }
 
     fn taplock_auth_with_config<C>(self, state: S, config: TapLockConfig) -> Self
@@ -324,5 +374,88 @@ where
             auth_middleware::<S, C>,
         ))
         .layer(axum::Extension(config))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    // Env vars are process-global, so tests that mutate TAPLOCK_COOKIE_DOMAIN must not run in parallel.
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn builder_sets_cookie_domain_explicitly() {
+        let config = TapLockConfig::builder().cookie_domain("example.com").build();
+        assert_eq!(config.cookie_domain.as_deref(), Some("example.com"));
+    }
+
+    #[test]
+    fn builder_falls_back_to_env_var() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        // SAFETY: edition 2021, single-threaded test; we restore the value afterwards.
+        let previous = std::env::var("TAPLOCK_COOKIE_DOMAIN").ok();
+        std::env::set_var("TAPLOCK_COOKIE_DOMAIN", "example.org");
+
+        let config = TapLockConfig::builder().build();
+        assert_eq!(config.cookie_domain.as_deref(), Some("example.org"));
+
+        match previous {
+            Some(v) => std::env::set_var("TAPLOCK_COOKIE_DOMAIN", v),
+            None => std::env::remove_var("TAPLOCK_COOKIE_DOMAIN"),
+        }
+    }
+
+    #[test]
+    fn builder_ignores_empty_env_var() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        // SAFETY: edition 2021, single-threaded test; we restore the value afterwards.
+        let previous = std::env::var("TAPLOCK_COOKIE_DOMAIN").ok();
+        std::env::set_var("TAPLOCK_COOKIE_DOMAIN", "");
+
+        let config = TapLockConfig::builder().build();
+        assert_eq!(config.cookie_domain, None);
+
+        match previous {
+            Some(v) => std::env::set_var("TAPLOCK_COOKIE_DOMAIN", v),
+            None => std::env::remove_var("TAPLOCK_COOKIE_DOMAIN"),
+        }
+    }
+
+    #[test]
+    fn explicit_config_takes_precedence_over_env_var() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        // SAFETY: edition 2021, single-threaded test; we restore the value afterwards.
+        let previous = std::env::var("TAPLOCK_COOKIE_DOMAIN").ok();
+        std::env::set_var("TAPLOCK_COOKIE_DOMAIN", "env.example.com");
+
+        let config = TapLockConfig::builder()
+            .cookie_domain("config.example.com")
+            .build();
+        assert_eq!(config.cookie_domain.as_deref(), Some("config.example.com"));
+
+        match previous {
+            Some(v) => std::env::set_var("TAPLOCK_COOKIE_DOMAIN", v),
+            None => std::env::remove_var("TAPLOCK_COOKIE_DOMAIN"),
+        }
+    }
+
+    #[test]
+    fn create_auth_cookie_includes_domain_when_set() {
+        let cookie = create_auth_cookie("taplock_access_token", "token".to_string(), Some("example.com".to_string()));
+        assert!(cookie.to_string().contains("Domain=example.com"));
+    }
+
+    #[test]
+    fn create_auth_cookie_omits_domain_when_unset() {
+        let cookie = create_auth_cookie("taplock_access_token", "token".to_string(), None);
+        assert!(!cookie.to_string().to_lowercase().contains("domain="));
+    }
+
+    #[test]
+    fn remove_auth_cookie_includes_domain_when_set() {
+        let cookie = remove_auth_cookie("taplock_access_token", Some("example.com".to_string()));
+        assert!(cookie.to_string().contains("Domain=example.com"));
     }
 }
