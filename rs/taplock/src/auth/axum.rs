@@ -114,7 +114,9 @@ impl TapLockConfigBuilder {
         let cookie_domain = if self.cookie_domain.is_some() {
             self.cookie_domain
         } else {
-            std::env::var("TAPLOCK_COOKIE_DOMAIN").ok().filter(|d| !d.is_empty())
+            std::env::var("TAPLOCK_COOKIE_DOMAIN")
+                .ok()
+                .filter(|d| !d.is_empty())
         };
         TapLockConfig {
             redirect_strategy: self.strategy,
@@ -145,13 +147,19 @@ fn remove_auth_cookie<'a>(name: &'a str, domain: Option<String>) -> Cookie<'a> {
     cookie
 }
 
-// Helper to extract bearer token from Authorization header
+// Helper to extract bearer token from Authorization header.
+// The scheme is case-insensitive per RFC 6750 ("Bearer", "bearer", "BEARER").
 fn extract_bearer_token(headers: &axum::http::HeaderMap) -> Option<String> {
-    headers
-        .get(AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .filter(|value| value.starts_with("Bearer "))
-        .map(|value| value[7..].to_string())
+    let value = headers.get(AUTHORIZATION)?.to_str().ok()?;
+    let (scheme, token) = value.split_once(' ')?;
+    if !scheme.eq_ignore_ascii_case("Bearer") {
+        return None;
+    }
+    let token = token.trim();
+    if token.is_empty() {
+        return None;
+    }
+    Some(token.to_string())
 }
 
 /// Axum middleware that handles OAuth2 authentication via cookies or Authorization header.
@@ -179,20 +187,21 @@ where
         .get::<TapLockConfig>()
         .and_then(|config| config.cookie_domain.clone());
 
-    // Try to get access token from cookie first, then from Authorization header
+    // Try to get access token from Authorization header first, then from cookie
+    let access_token_header_val = extract_bearer_token(req.headers());
     let access_token_cookie_val = jar
         .get(ACCESS_TOKEN_COOKIE_NAME)
         .map(|c| c.value().to_string());
-    let access_token_header_val = extract_bearer_token(req.headers());
     let refresh_token_cookie_val = jar
         .get(REFRESH_TOKEN_COOKIE_NAME)
         .map(|c| c.value().to_string());
 
-    // Prefer cookie token over header token (cookie is set by our login flow)
-    let access_token = access_token_cookie_val.or(access_token_header_val);
+    // Prefer the Authorization header over the cookie (cookie is set by our
+    // login flow); if one candidate fails validation, fall back to the other.
+    let candidates = [access_token_header_val, access_token_cookie_val];
 
-    // --- 1. Validate Access Token (from cookie or Authorization header) ---
-    if let Some(access_token) = access_token {
+    // --- 1. Validate Access Token (from Authorization header or cookie) ---
+    for access_token in candidates.into_iter().flatten() {
         match client.decode_access_token(access_token) {
             Ok(token_info) => {
                 req.extensions_mut().insert(token_info);
@@ -214,22 +223,30 @@ where
 
                 let mut response = next.run(req).await;
 
-                let new_access_cookie =
-                    create_auth_cookie(ACCESS_TOKEN_COOKIE_NAME, token_response.access_token, cookie_domain.clone());
+                let new_access_cookie = create_auth_cookie(
+                    ACCESS_TOKEN_COOKIE_NAME,
+                    token_response.access_token,
+                    cookie_domain.clone(),
+                );
                 response.headers_mut().append(
                     SET_COOKIE,
                     HeaderValue::from_str(&new_access_cookie.to_string()).unwrap(),
                 );
 
                 if let Some(new_refresh_token) = token_response.refresh_token {
-                    let new_refresh_cookie =
-                        create_auth_cookie(REFRESH_TOKEN_COOKIE_NAME, new_refresh_token, cookie_domain.clone());
+                    let new_refresh_cookie = create_auth_cookie(
+                        REFRESH_TOKEN_COOKIE_NAME,
+                        new_refresh_token,
+                        cookie_domain.clone(),
+                    );
                     response.headers_mut().append(
                         SET_COOKIE,
                         HeaderValue::from_str(&new_refresh_cookie.to_string()).unwrap(),
                     );
                 } else {
-                    let remove_old_refresh_cookie = remove_auth_cookie(REFRESH_TOKEN_COOKIE_NAME, cookie_domain.clone());                    response.headers_mut().append(
+                    let remove_old_refresh_cookie =
+                        remove_auth_cookie(REFRESH_TOKEN_COOKIE_NAME, cookie_domain.clone());
+                    response.headers_mut().append(
                         SET_COOKIE,
                         HeaderValue::from_str(&remove_old_refresh_cookie.to_string()).unwrap(),
                     );
@@ -253,12 +270,15 @@ where
         tracing::debug!("Authentication failed. Redirecting to login handler.");
         let mut response = Redirect::to(TAPLOCK_CALLBACK_ENDPOINT).into_response();
 
-        let remove_access_cookie = remove_auth_cookie(ACCESS_TOKEN_COOKIE_NAME, cookie_domain.clone());
+        let remove_access_cookie =
+            remove_auth_cookie(ACCESS_TOKEN_COOKIE_NAME, cookie_domain.clone());
         response.headers_mut().append(
             SET_COOKIE,
             HeaderValue::from_str(&remove_access_cookie.to_string()).unwrap(),
         );
-        let remove_refresh_cookie = remove_auth_cookie(REFRESH_TOKEN_COOKIE_NAME, cookie_domain.clone());        response.headers_mut().append(
+        let remove_refresh_cookie =
+            remove_auth_cookie(REFRESH_TOKEN_COOKIE_NAME, cookie_domain.clone());
+        response.headers_mut().append(
             SET_COOKIE,
             HeaderValue::from_str(&remove_refresh_cookie.to_string()).unwrap(),
         );
@@ -309,10 +329,14 @@ where
             Err(e) => {
                 tracing::error!("Failed to exchange code: {:?}", e);
                 let mut jar = jar;
-                let mut access_cookie =
-                    Cookie::build(ACCESS_TOKEN_COOKIE_NAME).removal().path("/").build();
-                let mut refresh_cookie =
-                    Cookie::build(REFRESH_TOKEN_COOKIE_NAME).removal().path("/").build();
+                let mut access_cookie = Cookie::build(ACCESS_TOKEN_COOKIE_NAME)
+                    .removal()
+                    .path("/")
+                    .build();
+                let mut refresh_cookie = Cookie::build(REFRESH_TOKEN_COOKIE_NAME)
+                    .removal()
+                    .path("/")
+                    .build();
                 if let Some(domain) = cookie_domain.clone() {
                     access_cookie.set_domain(domain.clone());
                     refresh_cookie.set_domain(domain);
@@ -380,14 +404,20 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::TapLockError;
+    use crate::OAuth2Response;
+    use axum::{body::Body, http::Request, routing::get, Router};
     use std::sync::Mutex;
+    use tower::ServiceExt;
 
     // Env vars are process-global, so tests that mutate TAPLOCK_COOKIE_DOMAIN must not run in parallel.
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn builder_sets_cookie_domain_explicitly() {
-        let config = TapLockConfig::builder().cookie_domain("example.com").build();
+        let config = TapLockConfig::builder()
+            .cookie_domain("example.com")
+            .build();
         assert_eq!(config.cookie_domain.as_deref(), Some("example.com"));
     }
 
@@ -443,7 +473,11 @@ mod tests {
 
     #[test]
     fn create_auth_cookie_includes_domain_when_set() {
-        let cookie = create_auth_cookie("taplock_access_token", "token".to_string(), Some("example.com".to_string()));
+        let cookie = create_auth_cookie(
+            "taplock_access_token",
+            "token".to_string(),
+            Some("example.com".to_string()),
+        );
         assert!(cookie.to_string().contains("Domain=example.com"));
     }
 
@@ -457,5 +491,253 @@ mod tests {
     fn remove_auth_cookie_includes_domain_when_set() {
         let cookie = remove_auth_cookie("taplock_access_token", Some("example.com".to_string()));
         assert!(cookie.to_string().contains("Domain=example.com"));
+    }
+
+    #[test]
+    fn remove_auth_cookie_omits_domain_when_unset() {
+        let cookie = remove_auth_cookie("taplock_access_token", None);
+        assert!(!cookie.to_string().to_lowercase().contains("domain="));
+    }
+
+    fn auth_headers(value: &'static str) -> axum::http::HeaderMap {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert(AUTHORIZATION, HeaderValue::from_static(value));
+        headers
+    }
+
+    #[test]
+    fn extract_bearer_token_accepts_standard_scheme() {
+        assert_eq!(
+            extract_bearer_token(&auth_headers("Bearer abc.def.ghi")).as_deref(),
+            Some("abc.def.ghi")
+        );
+    }
+
+    #[test]
+    fn extract_bearer_token_scheme_is_case_insensitive() {
+        assert_eq!(
+            extract_bearer_token(&auth_headers("bearer abc.def.ghi")).as_deref(),
+            Some("abc.def.ghi")
+        );
+        assert_eq!(
+            extract_bearer_token(&auth_headers("BEARER abc.def.ghi")).as_deref(),
+            Some("abc.def.ghi")
+        );
+    }
+
+    #[test]
+    fn extract_bearer_token_trims_whitespace_around_token() {
+        assert_eq!(
+            extract_bearer_token(&auth_headers("Bearer   abc.def.ghi  ")).as_deref(),
+            Some("abc.def.ghi")
+        );
+    }
+
+    #[test]
+    fn extract_bearer_token_rejects_other_schemes() {
+        assert_eq!(
+            extract_bearer_token(&auth_headers("Basic abc.def.ghi")),
+            None
+        );
+    }
+
+    #[test]
+    fn extract_bearer_token_rejects_missing_header() {
+        assert_eq!(extract_bearer_token(&axum::http::HeaderMap::new()), None);
+    }
+
+    #[test]
+    fn extract_bearer_token_rejects_missing_token() {
+        assert_eq!(extract_bearer_token(&auth_headers("Bearer")), None);
+        assert_eq!(extract_bearer_token(&auth_headers("Bearer ")), None);
+    }
+
+    const VALID_TOKEN: &str = "valid-jwt-token";
+
+    #[derive(Clone, Debug)]
+    struct MockClient {
+        valid_token: String,
+    }
+
+    #[async_trait::async_trait]
+    impl OAuth2Client for MockClient {
+        async fn exchange_refresh_token(
+            &self,
+            _refresh_token: String,
+        ) -> Result<OAuth2Response, TapLockError> {
+            Err(TapLockError::new("refresh not supported by mock"))
+        }
+
+        async fn exchange_code(&self, _code: String) -> Result<OAuth2Response, TapLockError> {
+            Err(TapLockError::new("code exchange not supported by mock"))
+        }
+
+        fn decode_access_token(
+            &self,
+            access_token: String,
+        ) -> Result<OAuth2Response, TapLockError> {
+            if access_token == self.valid_token {
+                Ok(OAuth2Response {
+                    access_token,
+                    refresh_token: None,
+                    fields: serde_json::json!({ "sub": "test-user" }),
+                })
+            } else {
+                Err(TapLockError::new("invalid token"))
+            }
+        }
+
+        fn get_authorization_url(&self) -> String {
+            "https://example.com/auth".to_string()
+        }
+    }
+
+    fn test_app(client: MockClient) -> Router {
+        Router::new()
+            .route("/protected", get(|| async { "ok" }))
+            .taplock_auth_with_config::<MockClient>(
+                client.clone(),
+                TapLockConfig::builder()
+                    .redirect_only(std::iter::empty::<String>())
+                    .build(),
+            )
+            .with_state(client)
+    }
+
+    async fn send(app: Router, req: Request<Body>) -> axum::response::Response {
+        app.oneshot(req).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn authenticates_with_bearer_header() {
+        let app = test_app(MockClient {
+            valid_token: VALID_TOKEN.to_string(),
+        });
+        let response = send(
+            app,
+            Request::builder()
+                .uri("/protected")
+                .header(AUTHORIZATION, format!("Bearer {VALID_TOKEN}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn bearer_header_scheme_is_case_insensitive() {
+        let app = test_app(MockClient {
+            valid_token: VALID_TOKEN.to_string(),
+        });
+        let response = send(
+            app,
+            Request::builder()
+                .uri("/protected")
+                .header(AUTHORIZATION, format!("bearer {VALID_TOKEN}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn authenticates_with_valid_cookie() {
+        let app = test_app(MockClient {
+            valid_token: VALID_TOKEN.to_string(),
+        });
+        let response = send(
+            app,
+            Request::builder()
+                .uri("/protected")
+                .header(
+                    axum::http::header::COOKIE,
+                    format!("{ACCESS_TOKEN_COOKIE_NAME}={VALID_TOKEN}"),
+                )
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn header_takes_precedence_over_stale_cookie() {
+        let app = test_app(MockClient {
+            valid_token: VALID_TOKEN.to_string(),
+        });
+        let response = send(
+            app,
+            Request::builder()
+                .uri("/protected")
+                .header(
+                    axum::http::header::COOKIE,
+                    format!("{ACCESS_TOKEN_COOKIE_NAME}=stale-token"),
+                )
+                .header(AUTHORIZATION, format!("Bearer {VALID_TOKEN}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn falls_back_to_cookie_when_header_token_is_stale() {
+        let app = test_app(MockClient {
+            valid_token: VALID_TOKEN.to_string(),
+        });
+        let response = send(
+            app,
+            Request::builder()
+                .uri("/protected")
+                .header(
+                    axum::http::header::COOKIE,
+                    format!("{ACCESS_TOKEN_COOKIE_NAME}={VALID_TOKEN}"),
+                )
+                .header(AUTHORIZATION, "Bearer stale-token")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn missing_credentials_return_unauthorized() {
+        let app = test_app(MockClient {
+            valid_token: VALID_TOKEN.to_string(),
+        });
+        let response = send(
+            app,
+            Request::builder()
+                .uri("/protected")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn invalid_credentials_return_unauthorized() {
+        let app = test_app(MockClient {
+            valid_token: VALID_TOKEN.to_string(),
+        });
+        let response = send(
+            app,
+            Request::builder()
+                .uri("/protected")
+                .header(
+                    axum::http::header::COOKIE,
+                    format!("{ACCESS_TOKEN_COOKIE_NAME}=stale-token"),
+                )
+                .header(AUTHORIZATION, "Bearer stale-token")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
 }
