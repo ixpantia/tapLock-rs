@@ -125,11 +125,15 @@ class TapLock:
 
     # --- Dependency ---
     def _extract_bearer_token(self, request: Request) -> Optional[str]:
-        """Extract Bearer token from Authorization header."""
+        """Extract Bearer token from Authorization header (scheme is case-insensitive)."""
         auth_header = request.headers.get("Authorization")
-        if auth_header and auth_header.startswith("Bearer "):
-            return auth_header[7:]  # Remove "Bearer " prefix
-        return None
+        if not auth_header:
+            return None
+        scheme, _, token = auth_header.partition(" ")
+        if scheme.lower() != "bearer":
+            return None
+        token = token.strip()
+        return token or None
 
     async def _handle_request(
         self,

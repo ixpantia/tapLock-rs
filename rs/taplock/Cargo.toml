@@ -28,3 +28,6 @@ axum-extra = ["dep:axum-extra"]
 axum = ["dep:axum", "axum-extra", "dep:tower-layer", "dep:tower"]
 tower-layer = ["dep:tower-layer"]
 tower = ["dep:tower"]
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }

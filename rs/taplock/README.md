@@ -104,6 +104,18 @@ Router::new()
 
 When no domain is set explicitly, the value of the `TAPLOCK_COOKIE_DOMAIN` environment variable is used. If neither is set, the cookies are host-only (the browser default).
 
+### Bearer Token Authentication
+
+Requests can also be authenticated with an `Authorization: Bearer` header instead of the session cookie. The token must be the tapLock-issued JWT (the same value stored in the `taplock_access_token` cookie). Raw provider access tokens are **not** accepted (they are opaque for Google and carry a different `aud` claim for Keycloak and Entra ID).
+
+```sh
+curl -H "Authorization: Bearer <tapLock-issued JWT>" https://your-app.com/dashboard
+```
+
+The `Authorization` header takes precedence over the cookie. If one source fails validation, the middleware falls back to the other before rejecting the request. The header scheme is case-insensitive (`Bearer`, `bearer`, `BEARER`).
+
+Note: the session cookie is `HttpOnly`, so browser JavaScript cannot read the token. Server-side handlers can obtain it from the decoded token info inserted into the request extensions, and non-browser clients can copy the cookie value.
+
 ## Environment Variables
 
 | Variable | Purpose |
